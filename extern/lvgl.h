@@ -45,7 +45,7 @@ static const lv_font_t lv_font_montserrat_16 = {0};
 static const lv_font_t lv_font_montserrat_20 = {0};
 static const lv_font_t lv_font_montserrat_28 = {0};
 typedef struct { lv_color_t bg_color; uint8_t bg_opa; int radius; } lv_draw_rect_dsc_t;
-typedef struct { lv_color_t color; const lv_font_t *font; int align; } lv_draw_label_dsc_t;
+typedef struct { lv_color_t color; const lv_font_t *font; int align; const char *text; } lv_draw_label_dsc_t;
 #define LV_SYMBOL_LEFT "<"
 #define LV_SYMBOL_RIGHT ">"
 #define LV_SYMBOL_REFRESH "R"
@@ -103,7 +103,7 @@ static inline void lv_textarea_set_text(lv_obj_t *o, const char *t) { (void)o;(v
 static inline const char *lv_textarea_get_text(lv_obj_t *o) { (void)o; return ""; }
 static inline void lv_canvas_set_buffer(lv_obj_t *o, void *b, int w, int h, int f) { (void)o;(void)b;(void)w;(void)h;(void)f; }
 static inline void lv_canvas_fill_bg(lv_obj_t *o, lv_color_t c, int a) { (void)o;(void)c;(void)a; }
-static inline lv_layer_t *lv_canvas_init_layer(lv_obj_t *o) { (void)o; return NULL; }
+static inline lv_layer_t *lv_canvas_init_layer(lv_obj_t *o, lv_layer_t *l) { (void)o;(void)l; return NULL; }
 static inline void lv_canvas_finish_layer(lv_obj_t *o, lv_layer_t *l) { (void)o;(void)l; }
 static inline void lv_draw_rect_dsc_init(lv_draw_rect_dsc_t *d) { if(d){d->bg_opa=0;d->radius=0;} }
 static inline void lv_draw_rect(lv_layer_t *l, lv_draw_rect_dsc_t *d, lv_area_t *a) { (void)l;(void)d;(void)a; }

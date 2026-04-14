@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-#include "ebowser/metrics.h"
+#include "ebrowser/metrics.h"
 #include <string.h>
 #include <stdio.h>
 
