@@ -218,6 +218,48 @@ cd build && ctest --output-on-failure
 
 ---
 
+## Security
+
+eBrowser includes security features for safe browsing on embedded devices. Contributions improving security are especially welcome.
+
+### TLS Configuration
+
+- TLS 1.2 is the minimum supported version; TLS 1.3 is preferred
+- Peer certificate verification and hostname validation are **enabled by default** — do not disable in production
+- The default cipher suite preference is: AES-128-GCM-SHA256, AES-256-GCM-SHA384, AES-128-CBC-SHA256
+- Provide a CA certificate bundle via `eb_tls_config_t.ca_cert_path` for proper chain-of-trust validation
+- **Note:** The current TLS I/O functions (`eb_tls_read`/`eb_tls_write`) are stubs pending a full transport implementation — do not use for production traffic without completing the implementation
+
+### Cookie Security
+
+Cookies set via `eb_cookie_jar_set()` include security attributes by default:
+
+- **HttpOnly** — prevents JavaScript access to cookies, mitigating XSS attacks
+- **Secure** — cookies are only sent over HTTPS connections
+- **SameSite=Lax** — provides CSRF protection while allowing top-level navigations
+
+### Building with Sanitizers
+
+For development and testing, enable AddressSanitizer and UndefinedBehaviorSanitizer:
+
+```bash
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
+make -j$(nproc)
+```
+
+### Security Scanning
+
+The repository runs automated security analysis via GitHub Actions:
+
+- **[CodeQL](.github/workflows/codeql.yml)** — static analysis for C/C++ vulnerabilities on every push and weekly
+- **[OpenSSF Scorecard](.github/workflows/scorecard.yml)** — supply chain security assessment
+- **[Weekly Tests](.github/workflows/weekly.yml)** — comprehensive testing with Valgrind memory checks
+
+To report a security vulnerability, please open a [GitHub Issue](https://github.com/embeddedos-org/eBrowser/issues) with the `security` label.
+
+---
+
 ## Contributing
 
 Contributions are welcome! To get started:

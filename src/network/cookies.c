@@ -67,7 +67,8 @@ int eb_cookie_jar_get_for_url(const eb_cookie_jar_t *jar, const char *url, bool 
 bool eb_cookie_jar_set(eb_cookie_jar_t *jar, const char *name, const char *value, const char *domain, const char *path, int max_age) {
     if (!jar || !name || !value) return false;
     char header[1024];
-    snprintf(header, sizeof(header), "%s=%s; Path=%s; Max-Age=%d", name, value, path ? path : "/", max_age);
+    snprintf(header, sizeof(header), "%s=%s; Path=%s; Max-Age=%d; HttpOnly; Secure; SameSite=Lax",
+             name, value, path ? path : "/", max_age);
     return eb_cookie_jar_parse_set_cookie(jar, header, domain);
 }
 

@@ -4,6 +4,7 @@
 #include "eBrowser/crypto.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 eb_tls_config_t eb_tls_config_default(void) {
     eb_tls_config_t cfg;
@@ -47,12 +48,29 @@ int eb_tls_set_hostname(eb_tls_ctx_t *ctx, const char *hostname) {
 }
 
 int eb_tls_handshake(eb_tls_ctx_t *ctx, int socket_fd) {
+    // TODO: STUB — no real TLS handshake is performed. This function simulates
+    // state transitions without actual network I/O or cryptographic negotiation.
+    // A production implementation must perform a real TLS handshake over socket_fd.
     if (!ctx) return -1;
     (void)socket_fd;
+    fprintf(stderr, "WARNING: eb_tls_handshake() is a stub — no real TLS handshake performed\n");
     ctx->state = EB_TLS_STATE_CLIENT_HELLO;
     ctx->state = EB_TLS_STATE_SERVER_HELLO;
     eb_crypto_random_bytes(ctx->server_random, 32);
     ctx->state = EB_TLS_STATE_CERTIFICATE;
+
+    // Validate peer certificate during handshake
+    if (ctx->verify_peer) {
+        eb_cert_status_t cert_status = eb_cert_validate_chain(
+            &ctx->peer_certs, ctx->verify_hostname ? ctx->hostname : NULL);
+        if (cert_status != EB_CERT_OK) {
+            fprintf(stderr, "ERROR: TLS certificate validation failed: %s\n",
+                    eb_cert_status_string(cert_status));
+            ctx->state = EB_TLS_STATE_CLOSED;
+            return -1;
+        }
+    }
+
     ctx->state = EB_TLS_STATE_KEY_EXCHANGE;
     eb_crypto_random_bytes(ctx->session.session_id, EB_TLS_SESSION_ID_LEN);
     eb_crypto_random_bytes(ctx->session.master_secret, EB_TLS_MASTER_SECRET_LEN);
@@ -63,13 +81,21 @@ int eb_tls_handshake(eb_tls_ctx_t *ctx, int socket_fd) {
 }
 
 int eb_tls_write(eb_tls_ctx_t *ctx, const uint8_t *data, size_t len) {
+    // TODO: STUB — data is not actually encrypted or sent over the network.
+    // A production implementation must encrypt data using the negotiated
+    // cipher suite and write TLS records to the underlying socket.
     if (!ctx || !data || ctx->state != EB_TLS_STATE_ESTABLISHED) return -1;
+    fprintf(stderr, "WARNING: eb_tls_write() is a stub — data not actually sent\n");
     (void)len;
     return (int)len;
 }
 
 int eb_tls_read(eb_tls_ctx_t *ctx, uint8_t *buf, size_t buf_len) {
+    // TODO: STUB — no data is actually read or decrypted from the network.
+    // A production implementation must read TLS records from the underlying
+    // socket and decrypt them using the negotiated cipher suite.
     if (!ctx || !buf || ctx->state != EB_TLS_STATE_ESTABLISHED) return -1;
+    fprintf(stderr, "WARNING: eb_tls_read() is a stub — no data actually read\n");
     (void)buf_len;
     return 0;
 }
