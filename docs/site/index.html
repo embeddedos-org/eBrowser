@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eBrowser — Embedded Web Browser | EmbeddedOS</title>
+  <meta name="description" content="Lightweight web browser engine for embedded and IoT devices. HTML5/CSS rendering, optional JavaScript, modular architecture, and 130+ test cases.">
+  <meta name="keywords" content="embedded browser, web browser, html5, css, rendering engine, iot, lightweight">
+  <meta name="author" content="EmbeddedOS">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://embeddedos-org.github.io/eBrowser/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="eBrowser — Embedded Web Browser | EmbeddedOS">
+  <meta property="og:description" content="Lightweight web browser engine for embedded and IoT devices. HTML5/CSS rendering, optional JavaScript, modular architecture, and 130+ test cases.">
+  <meta property="og:url" content="https://embeddedos-org.github.io/eBrowser/">
+  <meta property="og:site_name" content="EmbeddedOS">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="eBrowser — Embedded Web Browser | EmbeddedOS">
+  <meta name="twitter:description" content="Lightweight web browser engine for embedded and IoT devices. HTML5/CSS rendering, optional JavaScript, modular architecture, and 130+ test cases.">
+  <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "eBrowser",
+    "description": "Lightweight web browser engine for embedded and IoT devices. HTML5/CSS rendering, optional JavaScript, modular architecture, and 130+ test cases.",
+    "url": "https://embeddedos-org.github.io/eBrowser/",
+    "applicationCategory": "BrowserApplication",
+    "operatingSystem": "Linux, RTOS, Bare-Metal",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "codeRepository": "https://github.com/embeddedos-org/eBrowser",
+    "license": "https://opensource.org/licenses/MIT"
+  }
+  </script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="https://embeddedos-org.github.io/" class="logo">
+        <div class="logo-icon">EoS</div>
+        EmbeddedOS
+      </a>
+      <div class="nav-links">
+        <a href="https://embeddedos-org.github.io/">Home</a>
+        <a href="#features">Docs</a>
+        <a href="https://github.com/embeddedos-org/eBrowser" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-content">
+      <div class="hero-badges">
+        <span class="badge badge-cyan">Embedded</span>
+        <span class="badge badge-blue">HTML5</span>
+        <span class="badge badge-purple">Modular</span>
+      </div>
+      <h1 style="background: linear-gradient(135deg, #79c0ff, #58a6ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">eBrowser</h1>
+      <p class="subtitle">Lightweight web browser engine for embedded and IoT devices. HTML5/CSS rendering, optional JavaScript, modular architecture, and 130+ test cases.</p>
+      <div class="hero-buttons">
+        <a href="https://github.com/embeddedos-org/eBrowser" class="btn btn-primary" target="_blank" rel="noopener">View on GitHub</a>
+        <a href="#quickstart" class="btn btn-outline">Quick Start</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <h2 class="section-title">Features</h2>
+    <p class="section-subtitle">Everything you need for embedded web rendering</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <h3>HTML5/CSS Rendering Engine</h3>
+        <p>Full HTML5 and CSS rendering engine optimized for constrained embedded environments and IoT devices.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Optional JavaScript Engine</h3>
+        <p>Modular JS engine that can be included or excluded based on your resource constraints and requirements.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Modular Architecture</h3>
+        <p>Clean separation into rendering, network, and input layers for maximum flexibility and portability.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Platform Abstraction</h3>
+        <p>Runs on Linux, RTOS, and bare-metal targets with a unified platform abstraction layer.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Separate Rendering/Network/Input</h3>
+        <p>Independent layers allow you to swap implementations or run headless for testing and CI.</p>
+      </div>
+      <div class="feature-card">
+        <h3>130+ Test Cases (7 Suites)</h3>
+        <p>Comprehensive test coverage across 7 test suites ensuring reliability and correctness.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Zero-Prerequisite Setup</h3>
+        <p>Get started instantly — no external dependencies or complex toolchain setup required.</p>
+      </div>
+      <div class="feature-card">
+        <h3>DNS/TLS/HTTP Stack</h3>
+        <p>Built-in networking stack with DNS resolution, TLS encryption, and full HTTP client support.</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="section-alt">
+    <section class="section" id="quickstart">
+      <h2 class="section-title">Quick Start</h2>
+      <p class="section-subtitle">Get up and running in seconds</p>
+      <pre><code>git clone --recursive https://github.com/embeddedos-org/eBrowser.git
+cd eBrowser
+./setup.sh</code></pre>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-grid">
+        <div>
+          <strong style="color: var(--text-primary); font-size: 0.85rem;">Products</strong>
+          <a href="https://embeddedos-org.github.io/eBrowser/">eBrowser</a>
+          <a href="https://embeddedos-org.github.io/eVera/">eVera</a>
+          <a href="https://embeddedos-org.github.io/eStocks_Trading_Scripts/">eStocks</a>
+          <a href="https://embeddedos-org.github.io/eHardware-Designs-Products/">eHardware</a>
+        </div>
+        <div>
+          <strong style="color: var(--text-primary); font-size: 0.85rem;">Office Suite</strong>
+          <a href="https://embeddedos-org.github.io/eOffice/">eOffice</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eDocs</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eSheets</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eSlides</a>
+        </div>
+        <div>
+          <strong style="color: var(--text-primary); font-size: 0.85rem;">Office Apps</strong>
+          <a href="https://embeddedos-org.github.io/eOffice/">eNotes</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eMail</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eDrive</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eConnect</a>
+        </div>
+        <div>
+          <strong style="color: var(--text-primary); font-size: 0.85rem;">More</strong>
+          <a href="https://embeddedos-org.github.io/eOffice/">eForms</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">eSway</a>
+          <a href="https://embeddedos-org.github.io/eOffice/">ePlanner</a>
+          <a href="https://github.com/embeddedos-org">GitHub Org</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; 2025 EmbeddedOS. Open-source under MIT License.
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
