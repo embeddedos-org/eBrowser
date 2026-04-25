@@ -34,6 +34,9 @@ titlepage-background: "cover.png"
 ## Table of Contents
 
 
+![Figure: eBrowser — 3D Product Visualization](images/product-3d.png)
+
+
 ![Figure: eBrowser Page Load Pipeline — DNS, TLS, HTTP/2, HTML parse, CSS layout, paint](images/page-load.png)
 
 1. [Preface](#preface)
