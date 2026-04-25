@@ -33,6 +33,9 @@ titlepage-background: "cover.png"
 
 ## Table of Contents
 
+
+![Figure: eBrowser Page Load Pipeline — DNS, TLS, HTTP/2, HTML parse, CSS layout, paint](images/page-load.png)
+
 1. [Preface](#preface)
 2. [Chapter 1: Introduction to eBrowser](#chapter-1-introduction-to-ebrowser)
 3. [Chapter 2: Architecture Overview](#chapter-2-architecture-overview)
@@ -1628,6 +1631,9 @@ on DOM manipulation and event handling rather than full ECMAScript compliance.
 # Enable JS at build time
 >>> cmake -DEB_ENABLE_JS=ON ..
 ```
+
+![Figure: eBrowser JavaScript Engine Pipeline — parse, compile, execute, GC, DOM update](images/js-execution.png)
+
 
 ```c
 /* Enable JS at runtime */
