@@ -13,6 +13,9 @@ titlepage-background: "cover.png"
 
 ## Product Reference
 
+![Figure: eBrowser System Architecture — HTML5 parser, CSS engine, JS runtime, network stack](images/architecture.png)
+
+
 **Authors:** Srikanth Patchava & EmbeddedOS Contributors
 
 **Edition:** First Edition — April 2026
