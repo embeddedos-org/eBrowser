@@ -70,7 +70,32 @@ void eb_platform_free(void *ptr) {
 }
 
 size_t eb_platform_available_memory(void) {
+#if defined(_WIN32)
+    MEMORYSTATUSEX ms;
+    ms.dwLength = sizeof(ms);
+    if (GlobalMemoryStatusEx(&ms)) {
+        return (size_t)ms.ullAvailPhys;
+    }
     return 0;
+#elif defined(__linux__)
+    FILE *f = fopen("/proc/meminfo", "r");
+    if (!f) return 0;
+    char line[128];
+    size_t avail = 0;
+    while (fgets(line, sizeof(line), f)) {
+        unsigned long val;
+        if (sscanf(line, "MemAvailable: %lu kB", &val) == 1) {
+            avail = (size_t)val * 1024;
+            break;
+        }
+    }
+    fclose(f);
+    return avail;
+#elif defined(eBrowser_PLATFORM_EOS) || defined(eBrowser_PLATFORM_WEB)
+    return 0;
+#else
+    return 0;
+#endif
 }
 
 bool eb_platform_file_exists(const char *path) {
@@ -99,7 +124,7 @@ int eb_platform_read_file(const char *path, char **out_buf, size_t *out_len) {
     if (!buf) { fclose(f); return -1; }
     size_t read = fread(buf, 1, (size_t)size, f);
     fclose(f);
-    buf[read] = '\0';
+    buf[read] = 0;
     *out_buf = buf;
     *out_len = read;
     return 0;

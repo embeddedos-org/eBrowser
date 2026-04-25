@@ -6,6 +6,8 @@
 
 <p align="center">
   <a href="https://github.com/embeddedos-org/eBrowser/actions"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/ci.yml?branch=main&style=flat-square" alt="Build Status"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/codeql.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/codeql.yml?label=CodeQL&style=flat-square" alt="CodeQL"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/scorecard.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/scorecard.yml?label=Scorecard&style=flat-square" alt="Scorecard"></a>
   <a href="https://github.com/embeddedos-org/eBrowser/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/language-C%2FC%2B%2B-orange?style=flat-square" alt="Language">
 </p>
@@ -247,3 +249,11 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Security
+
+Please see [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
+
+---
+Part of the [EmbeddedOS Organization](https://embeddedos-org.github.io).
