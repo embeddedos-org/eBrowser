@@ -16,6 +16,8 @@
 
 ## 🚀 Quick Start — Zero Prerequisites
 
+[![Book](https://github.com/embeddedos-org/eBrowser/actions/workflows/book-build.yml/badge.svg)](https://github.com/embeddedos-org/eBrowser/actions/workflows/book-build.yml)
+
 No tools needed. The setup scripts auto-detect your OS and install everything (compiler, CMake, SDL2, LVGL):
 
 **Linux / macOS:**
