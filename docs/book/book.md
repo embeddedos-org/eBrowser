@@ -1,3 +1,14 @@
+---
+title: "eBrowser [@garsiel2011] — Official Reference Guide"
+author: "Srikanth Patchava & EmbeddedOS Contributors"
+date: "April 2026"
+version: "v1.0.0"
+bibliography: references.bib
+csl: ieee.csl
+titlepage: true
+titlepage-background: "cover.png"
+---
+
 # eBrowser — Lightweight Embedded Web Browser
 
 ## Product Reference
@@ -82,7 +93,7 @@ This book is written for:
 - **Students and Researchers** interested in browser engine internals and embedded systems
 
 We assume familiarity with C/C++ programming, embedded systems concepts, and basic
-web technologies (HTML, CSS, JavaScript). No prior experience with browser engine
+web technologies (HTML, CSS [@css_layout], JavaScript). No prior experience with browser engine
 internals is required — this book will take you from zero to expert.
 
 ## Conventions Used in This Book
@@ -104,7 +115,7 @@ who believe that the web should be accessible on every device, no matter how sma
 Special thanks to all contributors who have submitted patches, reported bugs, and
 helped shape the architecture described in this book. We also acknowledge the
 developers of the open-source libraries that eBrowser optionally integrates:
-SDL2, LVGL, and mbedTLS.
+SDL2, LVGL, and mbedTLS [@rfc8446].
 
 ---
 
@@ -120,7 +131,7 @@ to provide essential web-rendering capabilities while maintaining a binary footp
 measured in kilobytes and memory usage suitable for devices with as little as 256 KB
 of RAM.
 
-At its core, eBrowser implements a subset of the HTML5 and CSS specifications
+At its core, eBrowser implements a subset of the HTML5 [@w3c_html5] and CSS specifications
 sufficient for rendering structured documents, styled layouts, and interactive
 forms. An optional, lightweight JavaScript engine provides basic scripting support
 for devices that require interactivity beyond static page rendering.
@@ -154,7 +165,7 @@ possible.
 
 eBrowser employs several strategies to minimize memory consumption:
 
-- **Pool-based allocation** for DOM nodes and style objects avoids heap fragmentation
+- **Pool-based allocation** for DOM [@dom_spec] nodes and style objects avoids heap fragmentation
 - **Streaming HTML parsing** processes documents incrementally rather than loading
   the entire document into memory before parsing begins
 - **Shared string interning** deduplicates attribute names and CSS property values
@@ -980,7 +991,7 @@ typedef struct eb_http_response {
 | Redirects (3xx)           | Supported     | Up to 5 redirect hops          |
 | Basic Authentication      | Supported     | Base64-encoded credentials     |
 | Gzip Decompression        | Optional      | Requires zlib                  |
-| HTTP/2                    | Not supported | Not planned for embedded use   |
+| HTTP/2 [@rfc7540]                    | Not supported | Not planned for embedded use   |
 | WebSockets                | Not supported | Out of scope                   |
 
 ## 5.3 TLS Support
@@ -2676,3 +2687,8 @@ the EmbeddedOS project repository.
 ---
 
 *End of Document*
+
+## References
+
+::: {#refs}
+:::
