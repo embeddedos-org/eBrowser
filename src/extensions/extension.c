@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <strings.h>
 #include <time.h>
 
 void eb_ext_mgr_init(eb_ext_manager_t *m, const char *dir) {

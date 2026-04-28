@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <strings.h>
 
 static uint64_t tab_now(void) {
     struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);

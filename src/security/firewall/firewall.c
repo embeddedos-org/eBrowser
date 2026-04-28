@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <time.h>
-#include <strings.h>
 
 static uint64_t fw_now(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);

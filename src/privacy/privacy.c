@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <strings.h>
 
 static const char *s_default_tracking[] = {
     "utm_source","utm_medium","utm_campaign","utm_term","utm_content",

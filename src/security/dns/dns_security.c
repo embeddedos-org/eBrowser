@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <strings.h>
 
 void eb_dns_init(eb_dns_security_t *d) {
     if (!d) return; memset(d, 0, sizeof(*d));

@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <strings.h>
 
 void eb_bm_init(eb_bookmark_mgr_t *bm) {
     if (!bm) return; memset(bm, 0, sizeof(*bm));

@@ -25,12 +25,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04, macos-14]
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14, windows-latest]
         compiler: [gcc, clang]
         exclude:
           - os: ubuntu-24.04
             compiler: clang
           - os: macos-14
+            compiler: gcc
+          - os: windows-latest
             compiler: gcc
     steps:
       - name: Checkout
@@ -51,26 +53,42 @@ jobs:
           fi
 
       - name: Create include symlink
-        run: ln -sf ebrowser include/eBrowser 2>/dev/null || true
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # Windows: copy directory instead of symlink
+            cp -r include/ebrowser include/eBrowser 2>/dev/null || true
+          else
+            ln -sf ebrowser include/eBrowser 2>/dev/null || true
+          fi
 
       - name: Configure
+        shell: bash
         run: |
-          CC=${{ matrix.compiler }} cmake -B build \
-            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DBUILD_TESTING=ON \
-            -DeBrowser_BUILD_STANDALONE=OFF \
-            -DeBrowser_BUILD_BROWSER=OFF \
-            -DeBrowser_BUILD_RENDER=OFF \
-            -DCMAKE_C_FLAGS="-Wall -Wextra -Werror=format-security -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake -B build               -DBUILD_TESTING=ON               -DeBrowser_BUILD_STANDALONE=OFF               -DeBrowser_BUILD_BROWSER=OFF               -DeBrowser_BUILD_RENDER=OFF
+          else
+            CC=${{ matrix.compiler }} cmake -B build               -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}               -DBUILD_TESTING=ON               -DeBrowser_BUILD_STANDALONE=OFF               -DeBrowser_BUILD_BROWSER=OFF               -DeBrowser_BUILD_RENDER=OFF               -DCMAKE_C_FLAGS="-Wall -Wextra -Werror=format-security -fstack-protector-strong -D_FORTIFY_SOURCE=2"
+          fi
 
       - name: Build
-        run: cmake --build build --parallel $(nproc)
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build build --config Release --parallel
+          else
+            cmake --build build --parallel $(nproc)
+          fi
 
       - name: Run all tests
+        shell: bash
         run: |
           cd build
-          ctest --output-on-failure --timeout 30 \
-            -R "test_memory_safety|test_sandbox|test_firewall|test_anti_fingerprint|test_extension|test_privacy|test_tab_manager|test_bookmark"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ctest --output-on-failure --timeout 30 -C Release               -R "test_memory_safety|test_sandbox|test_firewall|test_anti_fingerprint|test_extension|test_privacy|test_tab_manager|test_bookmark"
+          else
+            ctest --output-on-failure --timeout 30               -R "test_memory_safety|test_sandbox|test_firewall|test_anti_fingerprint|test_extension|test_privacy|test_tab_manager|test_bookmark"
+          fi
 
       - name: Upload test results
         if: always()
@@ -111,7 +129,13 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-pie -Wl,-z,relro,-z,now,-z,noexecstack"
 
       - name: Build
-        run: cmake --build build --parallel $(nproc)
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cmake --build build --config Release --parallel
+          else
+            cmake --build build --parallel $(nproc)
+          fi
 
       - name: Verify compiler hardening
         run: |

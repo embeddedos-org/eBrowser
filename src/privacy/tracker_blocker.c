@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <strings.h>
 
 void eb_tb_init(eb_tracker_blocker_t *tb) {
     if (!tb) return; memset(tb, 0, sizeof(*tb));
