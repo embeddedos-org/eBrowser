@@ -1,0 +1,339 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:eb-2.0.0-20260427",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-04-27T00:00:00Z",
+    "tools": [
+      {
+        "name": "ebrowser-sbom-gen",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "eBrowser",
+      "version": "2.0.0",
+      "description": "The Most Secure Lightweight Browser",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/embeddedos-org/eBrowser@2.0.0",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://github.com/embeddedos-org/eBrowser"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/embeddedos-org/eBrowser.git"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/embeddedos-org/eBrowser/issues"
+        },
+        {
+          "type": "security-contact",
+          "url": "mailto:security@embeddedos.org"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "eBrowser Core Engine",
+      "version": "2.0.0",
+      "description": "HTML5/CSS3 parser, DOM, layout engine",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "language",
+          "value": "C11"
+        },
+        {
+          "name": "source-files",
+          "value": "src/engine/*.c"
+        },
+        {
+          "name": "lines-of-code",
+          "value": "~3000"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Security",
+      "version": "2.0.0",
+      "description": "CSP, XSS prevention, CORS, TLS 1.3, SHA-256, AES-128",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/security/*.c"
+        },
+        {
+          "name": "crypto-algorithms",
+          "value": "SHA-256, HMAC-SHA256, AES-128-CBC, PBKDF2"
+        },
+        {
+          "name": "note",
+          "value": "Pure C implementation, no OpenSSL dependency"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Sandbox",
+      "version": "2.0.0",
+      "description": "Process sandboxing via seccomp-BPF, namespaces, W^X",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/security/sandbox/sandbox.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Memory Safety",
+      "version": "2.0.0",
+      "description": "Hardened allocator with canaries, quarantine, UAF detection",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/security/memory/memory_safety.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Firewall",
+      "version": "2.0.0",
+      "description": "Application-level firewall with domain blocklist, CIDR, rate limiting",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/security/firewall/firewall.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Anti-Fingerprint",
+      "version": "2.0.0",
+      "description": "Browser fingerprinting protection (canvas, WebGL, fonts, timing)",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/security/anti_fingerprint/anti_fingerprint.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser DNS Security",
+      "version": "2.0.0",
+      "description": "DNS-over-HTTPS, DNSSEC, DNS rebinding protection",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/security/dns/dns_security.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Privacy Engine",
+      "version": "2.0.0",
+      "description": "Tracker blocker, URL cleaning, cookie policies, referrer stripping",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/privacy/*.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Extensions",
+      "version": "2.0.0",
+      "description": "WebExtensions Manifest V3 API",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/extensions/extension.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser Performance",
+      "version": "2.0.0",
+      "description": "Thread pool, LRU cache, HTTP/2, prefetcher, compression",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/perf/perf.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "eBrowser UI",
+      "version": "2.0.0",
+      "description": "Tab manager, bookmarks, downloads, devtools, reader mode, theme",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "source-files",
+          "value": "src/ui/*.c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "LVGL",
+      "version": "9.2",
+      "description": "Light and Versatile Graphics Library for embedded GUIs",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:github/lvgl/lvgl@release/v9.2",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://lvgl.io"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/lvgl/lvgl.git"
+        }
+      ],
+      "properties": [
+        {
+          "name": "relationship",
+          "value": "runtime-dependency"
+        },
+        {
+          "name": "fetch-method",
+          "value": "CMake FetchContent or git submodule"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "SDL2",
+      "version": "2.x",
+      "description": "Simple DirectMedia Layer \u2014 cross-platform multimedia library",
+      "licenses": [
+        {
+          "license": {
+            "id": "Zlib"
+          }
+        }
+      ],
+      "purl": "pkg:generic/sdl2",
+      "externalReferences": [
+        {
+          "type": "website",
+          "url": "https://www.libsdl.org"
+        }
+      ],
+      "properties": [
+        {
+          "name": "relationship",
+          "value": "optional-runtime-dependency"
+        },
+        {
+          "name": "note",
+          "value": "Only needed for desktop SDL2 port, not for embedded/web builds"
+        }
+      ]
+    }
+  ],
+  "vulnerabilities": []
+}
