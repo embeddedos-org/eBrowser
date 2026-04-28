@@ -1,0 +1,100 @@
+name: Fuzz Testing
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'  # Weekly on Monday at 4 AM UTC
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Fuzz duration in seconds per target'
+        required: false
+        default: '60'
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_html_parser
+          - fuzz_css_parser
+          - fuzz_url_parser
+          - fuzz_xss
+          - fuzz_firewall
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Clang + libFuzzer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang libsdl2-dev
+
+      - name: Create include symlink
+        run: ln -sf ebrowser include/eBrowser
+
+      - name: Configure with fuzzing + sanitizers
+        run: |
+          CC=clang cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DeBrowser_BUILD_FUZZ=ON \
+            -DeBrowser_BUILD_STANDALONE=OFF \
+            -DeBrowser_BUILD_BROWSER=OFF \
+            -DeBrowser_BUILD_RENDER=OFF \
+            -DBUILD_TESTING=OFF
+
+      - name: Build fuzz targets
+        run: cmake --build build --parallel $(nproc) --target ${{ matrix.target }}
+
+      - name: Determine corpus directory
+        id: corpus
+        run: |
+          case "${{ matrix.target }}" in
+            fuzz_html_parser) echo "dir=fuzz/corpus/html" >> $GITHUB_OUTPUT ;;
+            fuzz_css_parser)  echo "dir=fuzz/corpus/css"  >> $GITHUB_OUTPUT ;;
+            fuzz_url_parser)  echo "dir=fuzz/corpus/url"  >> $GITHUB_OUTPUT ;;
+            fuzz_xss)         echo "dir=fuzz/corpus/html" >> $GITHUB_OUTPUT ;;
+            fuzz_firewall)    echo "dir=fuzz/corpus/url"  >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Run fuzzer
+        run: |
+          DURATION=${{ github.event.inputs.duration || '60' }}
+          mkdir -p fuzz_output
+          echo "Running ${{ matrix.target }} for ${DURATION}s..."
+          timeout ${DURATION}s ./build/fuzz/${{ matrix.target }} \
+            fuzz_output/ ${{ steps.corpus.outputs.dir }}/ \
+            -max_len=65536 \
+            -timeout=10 \
+            -rss_limit_mb=2048 \
+            -print_final_stats=1 \
+            2>&1 | tail -30 || true
+          echo ""
+          echo "=== Final corpus stats ==="
+          ls fuzz_output/ | wc -l
+          echo "corpus files generated"
+
+      - name: Upload crash artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes-${{ matrix.target }}
+          path: |
+            crash-*
+            leak-*
+            timeout-*
+            oom-*
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload corpus
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-corpus-${{ matrix.target }}
+          path: fuzz_output/
+          retention-days: 7

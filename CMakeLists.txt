@@ -161,3 +161,9 @@ if(BUILD_TESTING)
     enable_testing()
     add_subdirectory(tests)
 endif()
+
+# --- Fuzzing ---
+option(eBrowser_BUILD_FUZZ "Build fuzzing harnesses (requires Clang)" OFF)
+if(eBrowser_BUILD_FUZZ)
+    add_subdirectory(fuzz)
+endif()
