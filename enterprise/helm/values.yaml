@@ -1,25 +1,54 @@
-replicaCount: 2
+replicaCount: 1
+
 image:
   repository: embeddedos/ebrowser
-  tag: enterprise-latest
+  tag: "2.0.0"
   pullPolicy: IfNotPresent
+
 service:
   type: ClusterIP
   port: 8080
-ingress:
-  enabled: true
-  hosts:
-    - host: ebrowser.eos.local
-      paths: ["/"]
+
 resources:
   limits:
-    cpu: 500m
-    memory: 512Mi
-  requests:
-    cpu: 100m
+    cpu: "2"
     memory: 128Mi
-autoscaling:
+  requests:
+    cpu: 250m
+    memory: 32Mi
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+
+env:
+  - name: EBROWSER_SECURITY_LEVEL
+    value: "strict"
+  - name: EBROWSER_HTTPS_ONLY
+    value: "true"
+  - name: EBROWSER_DOH_ENABLED
+    value: "true"
+  - name: EBROWSER_TRACKER_BLOCKER
+    value: "true"
+  - name: EBROWSER_ANTI_FINGERPRINT
+    value: "standard"
+
+persistence:
   enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
+  size: 1Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+
+healthcheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 30

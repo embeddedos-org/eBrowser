@@ -1,0 +1,5 @@
+add_library(eb_perf perf.c)
+target_include_directories(eb_perf PUBLIC ${CMAKE_SOURCE_DIR}/include)
+if(UNIX)
+  target_link_libraries(eb_perf PRIVATE pthread)
+endif()

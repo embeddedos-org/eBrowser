@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(eBrowser
-    VERSION 0.1.0
-    DESCRIPTION "eBrowser — lightweight web browser for embedded and IoT devices"
+    VERSION 2.0.0
+    DESCRIPTION "eBrowser - The Most Secure & Powerful Lightweight Browser"
     LANGUAGES C
 )
 
@@ -17,6 +17,12 @@ option(eBrowser_BUILD_BROWSER   "Build browser UI application"         ON)
 option(eBrowser_BUILD_JS        "Build optional JavaScript engine"     OFF)
 option(eBrowser_BUILD_SECURITY  "Build security and crypto layer"      ON)
 option(eBrowser_BUILD_STANDALONE "Build standalone executable"          ON)
+option(eBrowser_BUILD_SANDBOX   "Build process sandbox"                ON)
+option(eBrowser_BUILD_FIREWALL  "Build application firewall"           ON)
+option(eBrowser_BUILD_PRIVACY   "Build privacy & tracker blocker"      ON)
+option(eBrowser_BUILD_EXTENSIONS "Build WebExtensions system"          ON)
+option(eBrowser_BUILD_PERF      "Build performance engine"             ON)
+option(eBrowser_BUILD_UI        "Build advanced UI modules"            ON)
 
 # --- Platform detection ---
 if(CMAKE_TOOLCHAIN_FILE MATCHES "eos\\.cmake$")
@@ -30,12 +36,20 @@ else()
     add_definitions(-DeBrowser_PLATFORM_SDL2=1)
 endif()
 
-# --- Compiler warnings ---
+# --- Compiler warnings & hardening ---
 if(MSVC)
-    add_compile_options(/W3)
+    add_compile_options(/W3 /GS /DYNAMICBASE /NXCOMPAT)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 else()
-    add_compile_options(-Wall -Wextra -Wno-unused-parameter)
+    add_compile_options(
+        -Wall -Wextra -Wno-unused-parameter
+        -fstack-protector-strong
+        -D_FORTIFY_SOURCE=2
+        -fPIE
+    )
+    if(NOT APPLE)
+        add_link_options(-pie -Wl,-z,relro,-z,now,-z,noexecstack)
+    endif()
 endif()
 
 # --- LVGL ---
@@ -47,7 +61,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/lvgl/CMakeLists.txt")
     set(LV_USE_DRAW_SW_ASM "none" CACHE STRING "" FORCE)
     add_subdirectory(extern/lvgl)
 else()
-    message(STATUS "LVGL submodule not found — auto-downloading via FetchContent...")
+    message(STATUS "LVGL submodule not found - auto-downloading via FetchContent...")
     include(FetchContent)
     FetchContent_Declare(lvgl
         GIT_REPOSITORY https://github.com/lvgl/lvgl.git
@@ -56,6 +70,14 @@ else()
     )
     set(LV_USE_DRAW_SW_ASM "none" CACHE STRING "" FORCE)
     FetchContent_MakeAvailable(lvgl)
+    # Remove ARM assembly files on non-ARM platforms (x86/x64)
+    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64|ARM")
+        get_target_property(_lvgl_srcs lvgl SOURCES)
+        if(_lvgl_srcs)
+            list(FILTER _lvgl_srcs EXCLUDE REGEX "\\.S$")
+            set_target_properties(lvgl PROPERTIES SOURCES "${_lvgl_srcs}")
+        endif()
+    endif()
 endif()
 
 # --- Core engine ---
@@ -81,6 +103,35 @@ endif()
 # --- Security & Crypto ---
 if(eBrowser_BUILD_SECURITY)
     add_subdirectory(src/security)
+endif()
+
+# --- Sandbox ---
+if(eBrowser_BUILD_SANDBOX)
+    add_subdirectory(src/security/sandbox)
+    add_subdirectory(src/security/memory)
+    add_subdirectory(src/security/firewall)
+    add_subdirectory(src/security/anti_fingerprint)
+    add_subdirectory(src/security/dns)
+endif()
+
+# --- Privacy & Tracker Blocker ---
+if(eBrowser_BUILD_PRIVACY)
+    add_subdirectory(src/privacy)
+endif()
+
+# --- WebExtensions ---
+if(eBrowser_BUILD_EXTENSIONS)
+    add_subdirectory(src/extensions)
+endif()
+
+# --- Performance Engine ---
+if(eBrowser_BUILD_PERF)
+    add_subdirectory(src/perf)
+endif()
+
+# --- Advanced UI ---
+if(eBrowser_BUILD_UI)
+    add_subdirectory(src/ui)
 endif()
 
 # --- Telemetry ---

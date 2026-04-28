@@ -1,13 +1,19 @@
 apiVersion: v2
-name: eos-ebrowser
-description: Managed Browser — EoS Enterprise Helm Chart
+name: ebrowser
+description: eBrowser v2.0 — The Most Secure Lightweight Browser
 type: application
-version: 1.0.0
-appVersion: "1.0.0"
+version: 2.0.0
+appVersion: "2.0.0"
 maintainers:
-  - name: EmbeddedOS
+  - name: embeddedos-org
     url: https://github.com/embeddedos-org
 keywords:
-  - eos
-  - ebrowser
-  - enterprise
+  - browser
+  - security
+  - lightweight
+  - embedded
+  - iot
+  - privacy
+home: https://github.com/embeddedos-org/eBrowser
+sources:
+  - https://github.com/embeddedos-org/eBrowser

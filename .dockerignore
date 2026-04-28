@@ -1,0 +1,13 @@
+build/
+.git/
+*.o
+*.a
+*.so
+*.pyc
+__pycache__/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+enterprise/docker/docker-compose.yml

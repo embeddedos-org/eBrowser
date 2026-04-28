@@ -1,27 +1,120 @@
 version: '3.8'
+
 services:
+  # Main eBrowser application
   ebrowser:
-    build: .
-    container_name: eos-ebrowser
+    build:
+      context: ../..
+      dockerfile: enterprise/docker/Dockerfile
+    container_name: ebrowser
+    image: embeddedos/ebrowser:2.0.0
     restart: unless-stopped
     ports:
       - "8080:8080"
-    environment:
-      - NODE_ENV=production
-      - EOS_LICENSE_KEY=${EOS_LICENSE_KEY}
     volumes:
-      - ebrowser_data:/app/data
-    networks:
-      - eos-enterprise
+      - ebrowser_data:/opt/ebrowser/data
+      - ebrowser_extensions:/opt/ebrowser/data/extensions
+      - ebrowser_cache:/opt/ebrowser/data/cache
+    environment:
+      - EBROWSER_SECURITY_LEVEL=strict
+      - EBROWSER_THEME=dark
+      - EBROWSER_HTTPS_ONLY=true
+      - EBROWSER_DOH_ENABLED=true
+      - EBROWSER_TRACKER_BLOCKER=true
+      - EBROWSER_ANTI_FINGERPRINT=standard
+    security_opt:
+      - no-new-privileges:true
+      - seccomp:unconfined  # eBrowser has its own seccomp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '2.0'
+        reservations:
+          memory: 32M
+          cpus: '0.5'
     logging:
       driver: json-file
       options:
-        max-size: "10m"
+        max-size: "5m"
         max-file: "3"
+    networks:
+      - ebrowser-net
+
+  # Run benchmark on startup
+  benchmark:
+    build:
+      context: ../..
+      dockerfile: enterprise/docker/Dockerfile
+    container_name: ebrowser-benchmark
+    image: embeddedos/ebrowser:2.0.0
+    entrypoint: ["/opt/ebrowser/benchmark"]
+    profiles:
+      - benchmark
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - ebrowser-net
+
+  # Run load test
+  loadtest:
+    build:
+      context: ../..
+      dockerfile: enterprise/docker/Dockerfile
+    container_name: ebrowser-loadtest
+    image: embeddedos/ebrowser:2.0.0
+    entrypoint: ["/opt/ebrowser/load_test"]
+    profiles:
+      - loadtest
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - ebrowser-net
+
+  # Run full test suite
+  tests:
+    build:
+      context: ../..
+      dockerfile: enterprise/docker/Dockerfile
+    container_name: ebrowser-tests
+    image: embeddedos/ebrowser:2.0.0
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "=== eBrowser v2.0 Test Suite ===" &&
+        /opt/ebrowser/tests/test_memory_safety &&
+        /opt/ebrowser/tests/test_sandbox &&
+        /opt/ebrowser/tests/test_firewall &&
+        /opt/ebrowser/tests/test_anti_fingerprint &&
+        /opt/ebrowser/tests/test_extension &&
+        /opt/ebrowser/tests/test_privacy &&
+        /opt/ebrowser/tests/test_tab_manager &&
+        /opt/ebrowser/tests/test_bookmark &&
+        echo "=== All tests passed ==="
+    profiles:
+      - test
+    networks:
+      - ebrowser-net
 
 volumes:
   ebrowser_data:
+    driver: local
+  ebrowser_extensions:
+    driver: local
+  ebrowser_cache:
+    driver: local
 
 networks:
-  eos-enterprise:
-    external: true
+  ebrowser-net:
+    driver: bridge
