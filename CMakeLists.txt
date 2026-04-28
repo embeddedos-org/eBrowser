@@ -36,6 +36,11 @@ else()
     add_definitions(-DeBrowser_PLATFORM_SDL2=1)
 endif()
 
+# --- Platform defines ---
+if(UNIX AND NOT APPLE)
+    add_definitions(-D_GNU_SOURCE)
+endif()
+
 # --- Compiler warnings & hardening ---
 if(MSVC)
     add_compile_options(/W3 /GS /DYNAMICBASE /NXCOMPAT)

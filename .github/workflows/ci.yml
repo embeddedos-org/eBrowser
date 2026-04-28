@@ -25,11 +25,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, ubuntu-24.04]
+        os: [ubuntu-22.04, ubuntu-24.04, macos-14]
         compiler: [gcc, clang]
         exclude:
           - os: ubuntu-24.04
             compiler: clang
+          - os: macos-14
+            compiler: gcc
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,11 +40,14 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake libsdl2-dev pkg-config
-          if [ "${{ matrix.compiler }}" = "clang" ]; then
-            sudo apt-get install -y clang
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends               build-essential cmake libsdl2-dev pkg-config
+            if [ "${{ matrix.compiler }}" = "clang" ]; then
+              sudo apt-get install -y clang
+            fi
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            brew install cmake sdl2
           fi
 
       - name: Create include symlink
