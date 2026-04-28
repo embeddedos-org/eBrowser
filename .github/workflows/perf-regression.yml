@@ -1,0 +1,112 @@
+name: Performance Regression
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'tests/perf_regression.c'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'include/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  perf-regression:
+    name: Performance Check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake libsdl2-dev jq
+
+      - name: Create include symlink
+        run: ln -sf ebrowser include/eBrowser
+
+      - name: Build (Release, optimized)
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON \
+            -DeBrowser_BUILD_STANDALONE=OFF \
+            -DeBrowser_BUILD_BROWSER=OFF \
+            -DeBrowser_BUILD_RENDER=OFF \
+            -DCMAKE_C_FLAGS="-O2"
+          cmake --build build --parallel $(nproc)
+
+      - name: Run performance regression test
+        id: perf
+        run: |
+          cd build/tests
+          ./perf_regression 2>/dev/null | tee /tmp/perf_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+
+          # Extract JSON
+          sed -n '/PERF_JSON_START/,/PERF_JSON_END/p' /tmp/perf_output.txt | \
+            grep -v 'PERF_JSON' > /tmp/perf.json
+
+          # Parse key metrics
+          PIPELINE_RPS=$(jq '.metrics[] | select(.name=="pipeline_rps") | .value' /tmp/perf.json)
+          PIPELINE_US=$(jq '.metrics[] | select(.name=="pipeline") | .value' /tmp/perf.json)
+          FAILURES=$(jq '.failures' /tmp/perf.json)
+
+          echo "rps=$PIPELINE_RPS" >> $GITHUB_OUTPUT
+          echo "latency=$PIPELINE_US" >> $GITHUB_OUTPUT
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+
+      - name: Upload performance data
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-${{ github.sha }}
+          path: /tmp/perf.json
+          retention-days: 90
+
+      - name: Comment on PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const rps = '${{ steps.perf.outputs.rps }}';
+            const latency = '${{ steps.perf.outputs.latency }}';
+            const failures = '${{ steps.perf.outputs.failures }}';
+            const status = failures === '0' ? '✅ All metrics within thresholds' : '❌ Performance regression detected';
+
+            const body = `## Performance Regression Check ${status}
+
+            | Metric | Value | Status |
+            |--------|-------|--------|
+            | Pipeline RPS | ${parseFloat(rps).toLocaleString()} req/s | ${failures === '0' ? '✅' : '❌'} |
+            | Pipeline Latency | ${parseFloat(latency).toFixed(1)} µs/req | ${failures === '0' ? '✅' : '❌'} |
+
+            <details><summary>Full results</summary>
+
+            \`\`\`
+            ${require('fs').readFileSync('/tmp/perf_output.txt', 'utf8').substring(0, 3000)}
+            \`\`\`
+            </details>
+
+            *Commit: ${context.sha.substring(0, 8)}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail on regression
+        if: steps.perf.outputs.failures != '0'
+        run: |
+          echo "::error::Performance regression detected: ${{ steps.perf.outputs.failures }} metrics exceeded thresholds"
+          exit 1

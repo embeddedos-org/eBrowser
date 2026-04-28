@@ -105,3 +105,11 @@ target_link_libraries(load_test_combined PRIVATE
     eb_perf eb_memory_safety eb_firewall eb_anti_fingerprint
     eb_privacy eBrowser_security eb_extensions eb_ui pthread m)
 target_include_directories(load_test_combined PRIVATE /include)
+
+# --- Performance Regression Test ---
+add_executable(perf_regression perf_regression.c)
+target_link_libraries(perf_regression PRIVATE
+    eBrowser_engine eBrowser_network eBrowser_security
+    eb_firewall eb_privacy eb_anti_fingerprint eb_extensions
+    eb_memory_safety eb_ui m)
+target_include_directories(perf_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
