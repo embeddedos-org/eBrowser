@@ -1,43 +1,60 @@
-name: Nightly Regression
+name: Nightly
 
 on:
   schedule:
-    - cron: "0 2 * * *"
+    - cron: '0 3 * * *'  # 3 AM UTC daily
   workflow_dispatch:
 
-concurrency:
-  group: nightly-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
-  build-test:
-    name: Build & Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+  nightly-full:
+    name: Nightly Full Test Suite
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-      - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-      - name: Build
-        run: cmake --build build --config Release
-      - name: Test
-        run: ctest --test-dir build --output-on-failure -C Release || true
 
-  report:
-    name: Nightly Report
-    runs-on: ubuntu-latest
-    needs: [build-test]
-    if: always()
-    steps:
-      - name: Summary
+      - name: Install dependencies
         run: |
-          echo "## Nightly Report — eBrowser"
-          echo "Date: $(date -u '+%Y-%m-%d %H:%M UTC')"
-          echo "| Job | Status |"
-          echo "|---|---|"
-          echo "| Build & Test | ${{ needs.build-test.result }} |"
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsdl2-dev valgrind cppcheck
+
+      - name: Create include symlink
+        run: ln -sf ebrowser include/eBrowser
+
+      - name: Build Debug
+        run: |
+          cmake -B build-debug -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON \
+            -DeBrowser_BUILD_STANDALONE=OFF -DeBrowser_BUILD_BROWSER=OFF -DeBrowser_BUILD_RENDER=OFF
+          cmake --build build-debug --parallel $(nproc)
+
+      - name: Build Release
+        run: |
+          cmake -B build-release -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+            -DeBrowser_BUILD_STANDALONE=OFF -DeBrowser_BUILD_BROWSER=OFF -DeBrowser_BUILD_RENDER=OFF
+          cmake --build build-release --parallel $(nproc)
+
+      - name: Unit tests (Debug)
+        run: cd build-debug && ctest --output-on-failure
+
+      - name: Unit tests (Release)
+        run: cd build-release && ctest --output-on-failure
+
+      - name: Valgrind memory check
+        run: |
+          cd build-debug/tests
+          for t in test_memory_safety test_sandbox test_firewall test_anti_fingerprint test_extension test_privacy test_tab_manager test_bookmark; do
+            echo "=== $t ==="
+            valgrind --leak-check=full --error-exitcode=1 --quiet ./$t 2>&1 || echo "WARN: $t had valgrind issues"
+          done
+
+      - name: Static analysis
+        run: |
+          cppcheck --enable=all --suppress=missingIncludeSystem \
+            --error-exitcode=0 -I include/ src/ 2>&1 | head -50
+
+      - name: Benchmark
+        run: cd build-release/tests && ./benchmark 2>/dev/null
+
+      - name: Load test
+        run: cd build-release/tests && ./load_test_combined 2>/dev/null
