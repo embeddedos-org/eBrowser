@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "eBrowser/http.h"
 #include "eBrowser/url.h"
+#include "eBrowser/tls.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -56,7 +57,7 @@ static eb_socket_t connect_to_host(const char *host, int port) {
 #endif
 }
 
-static int send_all(eb_socket_t sock, const char *data, size_t len) {
+static int send_all_raw(eb_socket_t sock, const char *data, size_t len) {
 #if defined(eBrowser_PLATFORM_EOS) || defined(eBrowser_PLATFORM_WEB)
     (void)sock; (void)data; (void)len;
     return -1;
@@ -71,9 +72,17 @@ static int send_all(eb_socket_t sock, const char *data, size_t len) {
 #endif
 }
 
-static int recv_response(eb_socket_t sock, char **out, size_t *out_len) {
+static int send_all(eb_socket_t sock, const char *data, size_t len, eb_tls_ctx_t *tls) {
+    if (tls) {
+        int ret = eb_tls_write(tls, (const uint8_t *)data, len);
+        return (ret > 0) ? 0 : -1;
+    }
+    return send_all_raw(sock, data, len);
+}
+
+static int recv_response(eb_socket_t sock, char **out, size_t *out_len, eb_tls_ctx_t *tls) {
 #if defined(eBrowser_PLATFORM_EOS) || defined(eBrowser_PLATFORM_WEB)
-    (void)sock; (void)out; (void)out_len;
+    (void)sock; (void)out; (void)out_len; (void)tls;
     return -1;
 #else
     size_t capacity = HTTP_BUF_SIZE;
@@ -88,7 +97,12 @@ static int recv_response(eb_socket_t sock, char **out, size_t *out_len) {
             if (!tmp) { free(buf); return -1; }
             buf = tmp;
         }
-        int n = recv(sock, buf + total, HTTP_BUF_SIZE - 1, 0);
+        int n;
+        if (tls) {
+            n = eb_tls_read(tls, (uint8_t *)(buf + total), HTTP_BUF_SIZE - 1);
+        } else {
+            n = recv(sock, buf + total, HTTP_BUF_SIZE - 1, 0);
+        }
         if (n <= 0) break;
         total += (size_t)n;
     }
@@ -137,8 +151,33 @@ int eb_http_get(const char *url, eb_http_response_t *resp) {
     eb_url_t parsed;
     if (!eb_url_parse(url, &parsed)) return -1;
 
+    int use_tls = (strcmp(parsed.scheme, "https") == 0);
+    if (use_tls && parsed.port == 80) parsed.port = 443;
+
     eb_socket_t sock = connect_to_host(parsed.host, parsed.port);
     if (sock == EB_INVALID_SOCKET) return -1;
+
+    eb_tls_ctx_t tls_ctx;
+    eb_tls_ctx_t *tls = NULL;
+
+    if (use_tls) {
+        eb_tls_config_t tls_cfg = eb_tls_config_default();
+        if (eb_tls_init(&tls_ctx, &tls_cfg) != 0) {
+            eb_close_socket(sock);
+            return -1;
+        }
+        if (eb_tls_set_hostname(&tls_ctx, parsed.host) != 0) {
+            eb_tls_free(&tls_ctx);
+            eb_close_socket(sock);
+            return -1;
+        }
+        if (eb_tls_handshake(&tls_ctx, (int)sock) != 0) {
+            eb_tls_free(&tls_ctx);
+            eb_close_socket(sock);
+            return -1;
+        }
+        tls = &tls_ctx;
+    }
 
     char request[2048];
     snprintf(request, sizeof(request),
@@ -150,17 +189,21 @@ int eb_http_get(const char *url, eb_http_response_t *resp) {
              "\r\n",
              parsed.path[0] ? parsed.path : "/", parsed.host);
 
-    if (send_all(sock, request, strlen(request)) != 0) {
+    if (send_all(sock, request, strlen(request), tls) != 0) {
+        if (tls) { eb_tls_close(tls); eb_tls_free(tls); }
         eb_close_socket(sock);
         return -1;
     }
 
     char *raw = NULL;
     size_t raw_len = 0;
-    if (recv_response(sock, &raw, &raw_len) != 0) {
+    if (recv_response(sock, &raw, &raw_len, tls) != 0) {
+        if (tls) { eb_tls_close(tls); eb_tls_free(tls); }
         eb_close_socket(sock);
         return -1;
     }
+
+    if (tls) { eb_tls_close(tls); eb_tls_free(tls); }
     eb_close_socket(sock);
 
     int rc = parse_response(raw, raw_len, resp);
@@ -175,8 +218,33 @@ int eb_http_post(const char *url, const char *body, size_t body_len, eb_http_res
     eb_url_t parsed;
     if (!eb_url_parse(url, &parsed)) return -1;
 
+    int use_tls = (strcmp(parsed.scheme, "https") == 0);
+    if (use_tls && parsed.port == 80) parsed.port = 443;
+
     eb_socket_t sock = connect_to_host(parsed.host, parsed.port);
     if (sock == EB_INVALID_SOCKET) return -1;
+
+    eb_tls_ctx_t tls_ctx;
+    eb_tls_ctx_t *tls = NULL;
+
+    if (use_tls) {
+        eb_tls_config_t tls_cfg = eb_tls_config_default();
+        if (eb_tls_init(&tls_ctx, &tls_cfg) != 0) {
+            eb_close_socket(sock);
+            return -1;
+        }
+        if (eb_tls_set_hostname(&tls_ctx, parsed.host) != 0) {
+            eb_tls_free(&tls_ctx);
+            eb_close_socket(sock);
+            return -1;
+        }
+        if (eb_tls_handshake(&tls_ctx, (int)sock) != 0) {
+            eb_tls_free(&tls_ctx);
+            eb_close_socket(sock);
+            return -1;
+        }
+        tls = &tls_ctx;
+    }
 
     char header[2048];
     snprintf(header, sizeof(header),
@@ -189,18 +257,22 @@ int eb_http_post(const char *url, const char *body, size_t body_len, eb_http_res
              "\r\n",
              parsed.path[0] ? parsed.path : "/", parsed.host, body_len);
 
-    if (send_all(sock, header, strlen(header)) != 0 ||
-        (body && body_len > 0 && send_all(sock, body, body_len) != 0)) {
+    if (send_all(sock, header, strlen(header), tls) != 0 ||
+        (body && body_len > 0 && send_all(sock, body, body_len, tls) != 0)) {
+        if (tls) { eb_tls_close(tls); eb_tls_free(tls); }
         eb_close_socket(sock);
         return -1;
     }
 
     char *raw = NULL;
     size_t raw_len = 0;
-    if (recv_response(sock, &raw, &raw_len) != 0) {
+    if (recv_response(sock, &raw, &raw_len, tls) != 0) {
+        if (tls) { eb_tls_close(tls); eb_tls_free(tls); }
         eb_close_socket(sock);
         return -1;
     }
+
+    if (tls) { eb_tls_close(tls); eb_tls_free(tls); }
     eb_close_socket(sock);
 
     int rc = parse_response(raw, raw_len, resp);

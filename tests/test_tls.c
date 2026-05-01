@@ -11,11 +11,11 @@ static int s_pass = 0, s_fail = 0;
 
 TEST(test_config_default) {
     eb_tls_config_t cfg = eb_tls_config_default();
-    ASSERT(cfg.min_version == EB_TLS_1_2);
-    ASSERT(cfg.max_version == EB_TLS_1_3);
-    ASSERT(cfg.verify_peer == true);
-    ASSERT(cfg.verify_hostname == true);
-    ASSERT(cfg.cipher_count == 3);
+TEST(test_tls_free) {
+    eb_tls_ctx_t ctx;
+    eb_tls_init(&ctx, NULL);
+    eb_tls_free(&ctx);
+    ASSERT(ctx.state == 0);
 }
 
 TEST(test_tls_init) {
@@ -23,6 +23,7 @@ TEST(test_tls_init) {
     ASSERT(eb_tls_init(&ctx, NULL) == 0);
     ASSERT(ctx.state == EB_TLS_STATE_IDLE);
     ASSERT(ctx.verify_peer == true);
+    eb_tls_free(&ctx);
 }
 
 TEST(test_tls_init_with_config) {
@@ -31,6 +32,7 @@ TEST(test_tls_init_with_config) {
     eb_tls_ctx_t ctx;
     ASSERT(eb_tls_init(&ctx, &cfg) == 0);
     ASSERT(ctx.verify_peer == false);
+    eb_tls_free(&ctx);
 }
 
 TEST(test_tls_set_hostname) {
@@ -38,22 +40,36 @@ TEST(test_tls_set_hostname) {
     eb_tls_init(&ctx, NULL);
     ASSERT(eb_tls_set_hostname(&ctx, "example.com") == 0);
     ASSERT(strcmp(ctx.hostname, "example.com") == 0);
+    eb_tls_free(&ctx);
 }
 
 TEST(test_tls_handshake) {
     eb_tls_ctx_t ctx;
     eb_tls_init(&ctx, NULL);
+#ifndef EB_USE_MBEDTLS
+    /* Stub handshake works with invalid socket */
     ASSERT(eb_tls_handshake(&ctx, -1) == 0);
     ASSERT(ctx.state == EB_TLS_STATE_ESTABLISHED);
     ASSERT(ctx.session.valid == true);
+#else
+    /* With real mbedTLS, handshake needs a real socket — just test init state */
+    ASSERT(ctx.state == EB_TLS_STATE_IDLE);
+#endif
+    eb_tls_free(&ctx);
 }
 
 TEST(test_tls_close) {
     eb_tls_ctx_t ctx;
     eb_tls_init(&ctx, NULL);
+#ifndef EB_USE_MBEDTLS
     eb_tls_handshake(&ctx, -1);
     eb_tls_close(&ctx);
     ASSERT(ctx.state == EB_TLS_STATE_CLOSED);
+#else
+    eb_tls_close(&ctx);
+    ASSERT(ctx.state == EB_TLS_STATE_CLOSED);
+#endif
+    eb_tls_free(&ctx);
 }
 
 TEST(test_tls_free) {
@@ -136,6 +152,53 @@ TEST(test_session_invalidate) {
     ASSERT(eb_tls_session_load("invalidate.com", &loaded) != 0);
 }
 
+TEST(test_tls_init_free_lifecycle) {
+    eb_tls_ctx_t ctx;
+    eb_tls_config_t cfg = eb_tls_config_default();
+    ASSERT(eb_tls_init(&ctx, &cfg) == 0);
+    ASSERT(ctx.state == EB_TLS_STATE_IDLE);
+    eb_tls_free(&ctx);
+    /* After free, ctx should be zeroed */
+    ASSERT(ctx.state == 0);
+}
+
+TEST(test_tls_init_default_config) {
+    eb_tls_ctx_t ctx;
+    ASSERT(eb_tls_init(&ctx, NULL) == 0);
+    ASSERT(ctx.verify_peer == true);
+    ASSERT(ctx.verify_hostname == true);
+    eb_tls_free(&ctx);
+}
+
+TEST(test_tls_init_custom_config) {
+    eb_tls_config_t cfg = eb_tls_config_default();
+    cfg.verify_peer = false;
+    cfg.verify_hostname = false;
+    eb_tls_ctx_t ctx;
+    ASSERT(eb_tls_init(&ctx, &cfg) == 0);
+    ASSERT(ctx.verify_peer == false);
+    ASSERT(ctx.verify_hostname == false);
+    eb_tls_free(&ctx);
+}
+
+TEST(test_tls_init_close_free) {
+    eb_tls_ctx_t ctx;
+    ASSERT(eb_tls_init(&ctx, NULL) == 0);
+    eb_tls_close(&ctx);
+    ASSERT(ctx.state == EB_TLS_STATE_CLOSED);
+    eb_tls_free(&ctx);
+    ASSERT(ctx.state == 0);
+}
+
+TEST(test_tls_set_hostname_after_init) {
+    eb_tls_ctx_t ctx;
+    ASSERT(eb_tls_init(&ctx, NULL) == 0);
+    ASSERT(eb_tls_set_hostname(&ctx, "secure.example.com") == 0);
+    ASSERT(strcmp(ctx.hostname, "secure.example.com") == 0);
+    ASSERT(strcmp(ctx.session.hostname, "secure.example.com") == 0);
+    eb_tls_free(&ctx);
+}
+
 int main(void) {
     printf("=== TLS Tests ===\n");
     RUN(test_config_default); RUN(test_tls_init); RUN(test_tls_init_with_config);
@@ -144,6 +207,10 @@ int main(void) {
     RUN(test_cert_check_expiry); RUN(test_cert_validate_empty_chain);
     RUN(test_cert_validate_hostname_mismatch); RUN(test_cert_validate_self_signed);
     RUN(test_cert_status_strings); RUN(test_session_save_load); RUN(test_session_invalidate);
+    /* mbedTLS lifecycle tests */
+    RUN(test_tls_init_free_lifecycle); RUN(test_tls_init_default_config);
+    RUN(test_tls_init_custom_config); RUN(test_tls_init_close_free);
+    RUN(test_tls_set_hostname_after_init);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }

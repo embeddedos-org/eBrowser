@@ -6,3 +6,8 @@ add_library(eBrowser_security STATIC
     permissions.c
 )
 target_include_directories(eBrowser_security PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+if(eBrowser_USE_MBEDTLS)
+    target_link_libraries(eBrowser_security PRIVATE mbedtls mbedcrypto mbedx509)
+    target_compile_definitions(eBrowser_security PRIVATE EB_USE_MBEDTLS=1)
+endif()

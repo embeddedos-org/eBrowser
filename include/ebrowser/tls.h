@@ -6,6 +6,15 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef EB_USE_MBEDTLS
+#include "mbedtls/ssl.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/x509_crt.h"
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/error.h"
+#endif
+
 #define EB_TLS_MAX_CERT_CHAIN   8
 #define EB_TLS_MAX_HOSTNAME     256
 #define EB_TLS_SESSION_ID_LEN   32
@@ -87,6 +96,15 @@ typedef struct {
     bool               verify_hostname;
     uint8_t            client_random[32];
     uint8_t            server_random[32];
+#ifdef EB_USE_MBEDTLS
+    mbedtls_ssl_context      ssl;
+    mbedtls_ssl_config       conf;
+    mbedtls_entropy_context  entropy;
+    mbedtls_ctr_drbg_context ctr_drbg;
+    mbedtls_x509_crt         cacert;
+    mbedtls_net_context      server_fd;
+    int                      socket_fd;
+#endif
 } eb_tls_ctx_t;
 
 typedef struct {

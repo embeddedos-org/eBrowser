@@ -1,5 +1,6 @@
 add_library(eBrowser_network STATIC http.c url.c cache.c cookies.c)
 target_include_directories(eBrowser_network PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(eBrowser_network PRIVATE eBrowser_security)
 if(WIN32)
     target_link_libraries(eBrowser_network PRIVATE ws2_32)
 endif()

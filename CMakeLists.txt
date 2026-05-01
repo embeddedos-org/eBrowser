@@ -23,6 +23,7 @@ option(eBrowser_BUILD_PRIVACY   "Build privacy & tracker blocker"      ON)
 option(eBrowser_BUILD_EXTENSIONS "Build WebExtensions system"          ON)
 option(eBrowser_BUILD_PERF      "Build performance engine"             ON)
 option(eBrowser_BUILD_UI        "Build advanced UI modules"            ON)
+option(eBrowser_USE_MBEDTLS     "Use mbedTLS for real TLS support"    ON)
 
 # --- Platform detection ---
 if(CMAKE_TOOLCHAIN_FILE MATCHES "eos\\.cmake$")
@@ -36,7 +37,7 @@ else()
     add_definitions(-DeBrowser_PLATFORM_SDL2=1)
 endif()
 
-# --- Platform defines ---
+# --- Core engine ---
 if(UNIX AND NOT APPLE)
     add_definitions(-D_GNU_SOURCE)
 endif()
@@ -90,6 +91,20 @@ endif()
 # when building as a static library (prevents __imp_ linker errors)
 if(WIN32 AND TARGET lvgl)
     target_compile_definitions(lvgl PUBLIC LV_ATTRIBUTE_EXTERN_DATA=)
+endif()
+
+# --- mbedTLS (for real TLS support) ---
+if(eBrowser_USE_MBEDTLS)
+    include(FetchContent)
+    set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+    set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(mbedtls
+        GIT_REPOSITORY https://github.com/Mbed-TLS/mbedtls.git
+        GIT_TAG        v3.6.0
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(mbedtls)
 endif()
 
 # --- Core engine ---
