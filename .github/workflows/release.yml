@@ -237,32 +237,38 @@ jobs:
           Get-ChildItem release/bin/ | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length/1KB)) KB)" }
           Copy-Item README.md, CHANGELOG.md, LICENSE -Destination release/ -ErrorAction SilentlyContinue
 
-      - name: Generate icon
-        shell: pwsh
-        run: |
-          if (Test-Path "assets/logo.svg") {
-            magick convert "assets/logo.svg" -resize 256x256 "assets/logo.ico" 2>$null
-            if (Test-Path "assets/logo.ico") { Write-Host "Generated logo.ico" }
-          }
-
       - name: Build Installer
         shell: pwsh
         run: |
           $version = "${{ github.ref_name }}".TrimStart("v")
-          if (Test-Path "assets/logo.ico") {
-            iscc "/DEBROWSER_VERSION=$version" "installer/windows/ebrowser-setup.iss"
-          } else {
-            $content = Get-Content "installer/windows/ebrowser-setup.iss" | Where-Object { $_ -notmatch 'SetupIconFile=' }
-            $content | Set-Content "installer/windows/ebrowser-setup-noico.iss"
-            iscc "/DEBROWSER_VERSION=$version" "installer/windows/ebrowser-setup-noico.iss"
+          # Ensure output directory exists
+          New-Item -ItemType Directory -Force -Path build/installer | Out-Null
+          # Find iscc
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
           }
-          # Rename to include version
+          if (-not $iscc -or -not (Test-Path $iscc)) {
+            Write-Error "Inno Setup (iscc) not found!"
+            exit 1
+          }
+          Write-Host "Using: $iscc"
+          Write-Host "Version: $version"
+          Write-Host "Release bin contents:"
+          Get-ChildItem release/bin/ -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "  $($_.Name)" }
+          # Build installer
+          & $iscc "/DEBROWSER_VERSION=$version" "installer\windows\ebrowser-setup.iss"
+          if ($LASTEXITCODE -ne 0) { Write-Error "Inno Setup failed"; exit 1 }
+          # Copy output to repo root for upload
           $installer = Get-ChildItem -Path build/installer -Filter "*.exe" | Select-Object -First 1
           if ($installer) {
-            $newName = "eBrowser-$version-Setup-x64.exe"
-            Copy-Item $installer.FullName -Destination $newName
-            Write-Host "=== Installer ==="
-            Write-Host "  $newName ($([math]::Round((Get-Item $newName).Length/1MB, 1)) MB)"
+            Copy-Item $installer.FullName -Destination "eBrowser-$version-Setup-x64.exe"
+            Write-Host "=== Installer built ==="
+            Write-Host "  $($installer.Name) ($([math]::Round($installer.Length/1MB, 1)) MB)"
+          } else {
+            Write-Error "Installer .exe not found in build/installer/"
+            Get-ChildItem build/installer/ -ErrorAction SilentlyContinue
+            exit 1
           }
 
       - name: Upload installer
@@ -493,12 +499,78 @@ jobs:
           path: eBrowser-guide.pdf
 
   # ===========================================================
+  # Promo Video
+  # ===========================================================
+  build-video:
+    name: Build Promo Video
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check promo source
+        id: check
+        run: |
+          if [ -f promo/promo_scene.py ] && [ -f promo/generate_audio.py ]; then
+            echo "has_promo=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_promo=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Python
+        if: steps.check.outputs.has_promo == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        if: steps.check.outputs.has_promo == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libcairo2-dev libpango1.0-dev
+          pip install manim==0.18.1 edge-tts mutagen
+
+      - name: Generate narration audio
+        if: steps.check.outputs.has_promo == 'true'
+        run: |
+          cd promo
+          python generate_audio.py
+          ls -lh *.mp3
+
+      - name: Render video
+        if: steps.check.outputs.has_promo == 'true'
+        run: |
+          cd promo
+          manim render -qh --format mp4 promo_scene.py ProductPromo
+
+      - name: Merge video + audio
+        if: steps.check.outputs.has_promo == 'true'
+        run: |
+          cd promo
+          VIDEO=$(find media/videos -name "ProductPromo.mp4" | head -1)
+          if [ -n "$VIDEO" ]; then
+            ffmpeg -y -i "$VIDEO" -i narration.mp3 \
+              -c:v copy -c:a aac -b:a 192k \
+              -map 0:v:0 -map 1:a:0 \
+              -shortest \
+              eBrowser-promo.mp4
+            ls -lh eBrowser-promo.mp4
+          fi
+
+      - name: Upload video
+        if: steps.check.outputs.has_promo == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebrowser-promo-video
+          path: promo/eBrowser-promo.mp4
+
+  # ===========================================================
   # Create GitHub Release with installers
   # ===========================================================
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-macos-arm64, build-pdf]
+    needs: [build-linux, build-windows, build-macos-arm64, build-pdf, build-video]
     if: always() && needs.build-linux.result == 'success'
     steps:
       - uses: actions/checkout@v4
@@ -517,7 +589,7 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p final
-          find artifacts -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.pdf" \) \
+          find artifacts -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.pdf" -o -name "*.mp4" \) \
             -exec cp {} final/ \;
           echo "=== Release assets ==="
           ls -lh final/
@@ -539,6 +611,7 @@ jobs:
             | **Linux** (Debian/Ubuntu) | `eBrowser-linux-x86_64.deb` | `sudo dpkg -i eBrowser-*.deb` |
             | **Linux** (Any distro) | `eBrowser-x86_64.AppImage` | `chmod +x eBrowser-*.AppImage && ./eBrowser-*.AppImage` |
             | **Reference Guide** | `eBrowser-guide.pdf` | |
+            | **Promo Video** | `eBrowser-promo.mp4` | |
 
             ### Highlights
             - Process sandbox (seccomp-BPF + namespaces)

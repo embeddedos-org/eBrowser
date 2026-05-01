@@ -1,20 +1,24 @@
 ; eBrowser Windows Installer — Inno Setup Script
-; Build with: iscc installer/windows/ebrowser-setup.iss
+; Build from repo root: iscc /DEBROWSER_VERSION=x.y.z installer/windows/ebrowser-setup.iss
+
+#ifndef EBROWSER_VERSION
+#define EBROWSER_VERSION "2.0.0"
+#endif
 
 #define MyAppName "eBrowser"
-#define MyAppVersion GetEnv('EBROWSER_VERSION')
-#if MyAppVersion == ""
-#define MyAppVersion "2.0.0"
-#endif
 #define MyAppPublisher "EmbeddedOS"
 #define MyAppURL "https://github.com/embeddedos-org/eBrowser"
 #define MyAppExeName "eBrowser.exe"
 
+; Paths relative to this .iss file location (installer/windows/)
+#define RepoRoot "..\.."
+#define ReleaseBin RepoRoot + "\release\bin"
+
 [Setup]
 AppId={{E8B0F4A2-7C3D-4F1E-9A5B-2D6E8F0A1B3C}
 AppName={#MyAppName}
-AppVersion={#MyAppVersion}
-AppVerName={#MyAppName} {#MyAppVersion}
+AppVersion={#EBROWSER_VERSION}
+AppVerName={#MyAppName} {#EBROWSER_VERSION}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
@@ -22,9 +26,9 @@ AppUpdatesURL={#MyAppURL}/releases
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
-LicenseFile=..\..\LICENSE
-OutputDir=..\..\build\installer
-OutputBaseFilename=eBrowser-{#MyAppVersion}-Setup
+LicenseFile={#RepoRoot}\LICENSE
+OutputDir={#RepoRoot}\build\installer
+OutputBaseFilename=eBrowser-{#EBROWSER_VERSION}-Setup-x64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -32,9 +36,6 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallMode=x64compatible
 MinVersion=10.0
 UninstallDisplayIcon={app}\{#MyAppExeName}
-SetupIconFile=..\..\assets\logo.ico
-; Note: Generate logo.ico from logo.svg before building installer
-; Use: magick convert assets/logo.svg -resize 256x256 assets/logo.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -45,15 +46,13 @@ Name: "addtopath"; Description: "Add eBrowser to system PATH"; GroupDescription:
 
 [Files]
 ; Main application
-Source: "..\..\release\bin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; SDL2 runtime
-Source: "..\..\release\bin\SDL2.dll"; DestDir: "{app}"; Flags: ignoreversion
-; Any other DLLs
-Source: "..\..\release\bin\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "{#ReleaseBin}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; All DLLs (SDL2, OpenSSL, etc.)
+Source: "{#ReleaseBin}\*.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; Documentation
-Source: "..\..\README.md"; DestDir: "{app}\docs"; Flags: ignoreversion
-Source: "..\..\CHANGELOG.md"; DestDir: "{app}\docs"; Flags: ignoreversion
-Source: "..\..\LICENSE"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "{#RepoRoot}\README.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "{#RepoRoot}\CHANGELOG.md"; DestDir: "{app}\docs"; Flags: ignoreversion
+Source: "{#RepoRoot}\LICENSE"; DestDir: "{app}\docs"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
