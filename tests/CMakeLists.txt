@@ -86,8 +86,8 @@ add_executable(test_bookmark test_bookmark.c)
 target_link_libraries(test_bookmark PRIVATE eb_ui)
 add_test(NAME test_bookmark COMMAND test_bookmark)
 
-# --- POSIX-only targets (require unistd.h, pthread) ---
-if(NOT WIN32)
+# --- Linux-only targets (require unistd.h, pthread, sys/epoll.h) ---
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
 add_executable(benchmark benchmark.c)
 target_link_libraries(benchmark PRIVATE
