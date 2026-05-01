@@ -7,6 +7,8 @@
 <p align="center">
   <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/ci.yml?branch=master&label=CI&style=flat-square" alt="CI"></a>
   <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/release.yml?label=Release&style=flat-square" alt="Release"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/release.yml?label=Docker&logo=docker&style=flat-square" alt="Docker Release"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/pkgs/container/ebrowser"><img src="https://img.shields.io/badge/ghcr.io-embeddedos--org%2Febrowser-blue?logo=docker&style=flat-square" alt="GHCR Image"></a>
   <a href="https://github.com/embeddedos-org/eBrowser/releases/latest"><img src="https://img.shields.io/github/v/release/embeddedos-org/eBrowser?style=flat-square" alt="Latest Release"></a>
   <a href="https://github.com/embeddedos-org/eBrowser/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/language-C11-orange?style=flat-square" alt="C11">
