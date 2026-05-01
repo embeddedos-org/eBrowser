@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define SDL_MAIN_HANDLED
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #define WINDOW_WIDTH  800
 #define WINDOW_HEIGHT 480

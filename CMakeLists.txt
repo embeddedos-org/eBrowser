@@ -86,6 +86,12 @@ else()
     endif()
 endif()
 
+# On Windows, ensure LVGL symbols are not decorated with dllimport/dllexport
+# when building as a static library (prevents __imp_ linker errors)
+if(WIN32 AND TARGET lvgl)
+    target_compile_definitions(lvgl PUBLIC lv_EXPORTS)
+endif()
+
 # --- Core engine ---
 if(eBrowser_BUILD_ENGINE)
     add_subdirectory(src/engine)
