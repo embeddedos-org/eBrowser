@@ -90,6 +90,7 @@ jobs:
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_TESTING=OFF `
+            -DBUILD_SHARED_LIBS=OFF `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build --config Release --parallel
 
@@ -130,9 +131,6 @@ jobs:
 
       - name: Install dependencies
         run: brew install sdl2
-
-      - name: Create include symlink
-        run: ln -sf ebrowser include/eBrowser
 
       - name: Build Release
         continue-on-error: true
