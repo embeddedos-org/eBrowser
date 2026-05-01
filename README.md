@@ -5,8 +5,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/embeddedos-org/eBrowser/actions"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/ci.yml?branch=main&style=flat-square" alt="Build"></a>
-  <a href="https://github.com/embeddedos-org/eBrowser/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/ci.yml?branch=master&label=CI&style=flat-square" alt="CI"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/embeddedos-org/eBrowser/release.yml?label=Release&style=flat-square" alt="Release"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/releases/latest"><img src="https://img.shields.io/github/v/release/embeddedos-org/eBrowser?style=flat-square" alt="Latest Release"></a>
+  <a href="https://github.com/embeddedos-org/eBrowser/blob/master/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/language-C11-orange?style=flat-square" alt="C11">
   <img src="https://img.shields.io/badge/security-fortress-brightgreen?style=flat-square" alt="Security">
   <img src="https://img.shields.io/badge/extensions-WebExtensions_V3-purple?style=flat-square" alt="Extensions">
