@@ -91,6 +91,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_TESTING=OFF `
             -DBUILD_SHARED_LIBS=OFF `
+            -DCMAKE_C_FLAGS="/DLV_ATTRIBUTE_EXTERN_DATA=" `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build --config Release --parallel
 
@@ -137,7 +138,8 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_PREFIX_PATH=$(brew --prefix)
           cmake --build build --parallel $(sysctl -n hw.ncpu)
 
       - name: Package release artifacts
