@@ -32,8 +32,8 @@ OutputBaseFilename=eBrowser-{#EBROWSER_VERSION}-Setup-x64
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64compatible
-ArchitecturesInstallMode=x64compatible
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 MinVersion=10.0
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
