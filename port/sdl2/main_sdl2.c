@@ -4,6 +4,7 @@
 #include "eBrowser/browser.h"
 #include <stdio.h>
 #include <stdlib.h>
+#define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 
 #define WINDOW_WIDTH  800
