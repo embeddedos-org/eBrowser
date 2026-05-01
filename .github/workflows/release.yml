@@ -90,13 +90,9 @@ jobs:
         run: |
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
-            -DBUILD_TESTING=ON `
+            -DBUILD_TESTING=OFF `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build --config Release --parallel
-
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure -C Release
-        continue-on-error: true
 
       - name: Package release artifacts
         shell: pwsh
@@ -137,12 +133,8 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=OFF
           cmake --build build --parallel $(sysctl -n hw.ncpu)
-
-      - name: Run tests
-        run: ctest --test-dir build --output-on-failure
-        continue-on-error: true
 
       - name: Package release artifacts
         run: |

@@ -63,11 +63,7 @@ target_link_libraries(test_firewall PRIVATE eb_firewall)
 add_test(NAME test_firewall COMMAND test_firewall)
 
 add_executable(test_anti_fingerprint test_anti_fingerprint.c)
-if(WIN32)
-    target_link_libraries(test_anti_fingerprint PRIVATE eb_anti_fingerprint)
-else()
-    target_link_libraries(test_anti_fingerprint PRIVATE eb_anti_fingerprint m)
-endif()
+target_link_libraries(test_anti_fingerprint PRIVATE eb_anti_fingerprint m)
 add_test(NAME test_anti_fingerprint COMMAND test_anti_fingerprint)
 
 add_executable(test_extension test_extension.c)
@@ -86,9 +82,7 @@ add_executable(test_bookmark test_bookmark.c)
 target_link_libraries(test_bookmark PRIVATE eb_ui)
 add_test(NAME test_bookmark COMMAND test_bookmark)
 
-# --- Linux-only targets (require unistd.h, pthread, sys/epoll.h) ---
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-
+# --- Benchmark ---
 add_executable(benchmark benchmark.c)
 target_link_libraries(benchmark PRIVATE
     eBrowser_engine eBrowser_network eBrowser_security eBrowser_plugin eBrowser_telemetry
@@ -96,6 +90,7 @@ target_link_libraries(benchmark PRIVATE
     eb_dns_security eb_extensions eb_perf eb_ui m)
 target_include_directories(benchmark PRIVATE /include)
 
+# --- HTTP/2 Server + Load Test ---
 add_executable(http2_server http2_server.c)
 target_link_libraries(http2_server PRIVATE
     eb_perf eb_memory_safety eb_firewall eb_anti_fingerprint
@@ -111,11 +106,10 @@ target_link_libraries(load_test_combined PRIVATE
     eb_privacy eBrowser_security eb_extensions eb_ui pthread m)
 target_include_directories(load_test_combined PRIVATE /include)
 
+# --- Performance Regression Test ---
 add_executable(perf_regression perf_regression.c)
 target_link_libraries(perf_regression PRIVATE
     eBrowser_engine eBrowser_network eBrowser_security
     eb_firewall eb_privacy eb_anti_fingerprint eb_extensions
     eb_memory_safety eb_ui m)
 target_include_directories(perf_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-
-endif()
