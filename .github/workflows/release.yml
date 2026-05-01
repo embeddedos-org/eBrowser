@@ -9,9 +9,11 @@ permissions:
   packages: write
 
 jobs:
-  # Build, test, then release
-  build-and-release:
-    name: Build & Release
+  # ═══════════════════════════════════════════════════
+  # 1. BUILD ON LINUX (existing behavior preserved)
+  # ═══════════════════════════════════════════════════
+  build-linux:
+    name: Build — Linux x86_64
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -64,51 +66,234 @@ jobs:
           cp README.md CHANGELOG.md LICENSE release/
           tar czf ebrowser-${{ github.ref_name }}-linux-x86_64.tar.gz -C release .
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebrowser-linux-x86_64
+          path: ebrowser-${{ github.ref_name }}-linux-x86_64.tar.gz
+
+  # ═══════════════════════════════════════════════════
+  # 2. BUILD ON WINDOWS
+  # ═══════════════════════════════════════════════════
+  build-windows:
+    name: Build — Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: vcpkg install sdl2:x64-windows
+
+      - name: Build Release
+        run: |
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_TESTING=ON `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
+          cmake --build build --config Release --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure -C Release
+        continue-on-error: true
+
+      - name: Package release artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          # Copy executables
+          Get-ChildItem -Path build -Recurse -Include *.exe | ForEach-Object {
+            Copy-Item $_.FullName -Destination release/
+          }
+          # Copy DLLs
+          Get-ChildItem -Path build -Recurse -Include *.dll | ForEach-Object {
+            Copy-Item $_.FullName -Destination release/
+          }
+          Copy-Item README.md, CHANGELOG.md, LICENSE -Destination release/ -ErrorAction SilentlyContinue
+          Compress-Archive -Path release/* -DestinationPath "ebrowser-${{ github.ref_name }}-windows-x86_64.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebrowser-windows-x86_64
+          path: ebrowser-${{ github.ref_name }}-windows-x86_64.zip
+
+  # ═══════════════════════════════════════════════════
+  # 3. BUILD ON macOS
+  # ═══════════════════════════════════════════════════
+  build-macos:
+    name: Build — macOS x86_64
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install sdl2
+
+      - name: Build Release
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON
+          cmake --build build --parallel $(sysctl -n hw.ncpu)
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+        continue-on-error: true
+
+      - name: Package release artifacts
+        run: |
+          mkdir -p release
+          find build -maxdepth 3 -type f -perm +111 \
+            \( -name "benchmark" -o -name "load_test*" -o -name "eBrowser" -o -name "ebrowser" \) \
+            -exec cp {} release/ \; 2>/dev/null || true
+          find build -maxdepth 3 -type f -name "*.dylib" \
+            -exec cp {} release/ \; 2>/dev/null || true
+          cp README.md CHANGELOG.md LICENSE release/ 2>/dev/null || true
+          tar czf ebrowser-${{ github.ref_name }}-macos-x86_64.tar.gz -C release .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebrowser-macos-x86_64
+          path: ebrowser-${{ github.ref_name }}-macos-x86_64.tar.gz
+
+  # ═══════════════════════════════════════════════════
+  # 4. BUILD BOOK PDF
+  # ═══════════════════════════════════════════════════
+  build-pdf:
+    name: Build Book PDF
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check book source
+        id: check
+        run: |
+          if [ ! -f docs/book/book.md ]; then
+            echo "has_book=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_book=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install pandoc & LaTeX
+        if: steps.check.outputs.has_book == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-fonts-extra
+
+      - name: Clean source
+        if: steps.check.outputs.has_book == 'true'
+        run: sed -i 's/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]//g' docs/book/book.md
+
+      - name: Generate PDF
+        if: steps.check.outputs.has_book == 'true'
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          pandoc \
+            docs/book/book.md \
+            -o eBrowser-guide.pdf \
+            --pdf-engine=xelatex \
+            --from=markdown+smart \
+            -V geometry:margin=1in \
+            -V fontsize=11pt \
+            -V documentclass=report \
+            -V "title=eBrowser — Official Reference Guide" \
+            -V "subtitle=Version $VERSION" \
+            -V "author=Srikanth Patchava \\& EmbeddedOS Contributors" \
+            -V "date=$(date +'%B %Y')" \
+            -V toc=true \
+            -V toc-depth=3 \
+            -V colorlinks=true \
+            -V linkcolor=blue \
+            -V urlcolor=blue \
+            --highlight-style=tango \
+            --number-sections
+
+      - name: Verify PDF
+        if: steps.check.outputs.has_book == 'true'
+        run: |
+          if [ ! -f eBrowser-guide.pdf ]; then
+            echo "ERROR: PDF not generated"
+            exit 1
+          fi
+          SIZE=$(du -h eBrowser-guide.pdf | cut -f1)
+          echo "PDF generated: $SIZE"
+
+      - name: Upload PDF artifact
+        if: steps.check.outputs.has_book == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: book-pdf
+          path: eBrowser-guide.pdf
+
+  # ═══════════════════════════════════════════════════
+  # 5. CREATE RELEASE WITH ALL ASSETS
+  # ═══════════════════════════════════════════════════
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-windows, build-macos, build-pdf]
+    if: always() && needs.build-linux.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Extract version
         id: version
         run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect release files
+        run: |
+          mkdir -p final
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.pdf" \) \
+            -exec cp {} final/ \;
+          echo "Release assets:"
+          ls -lh final/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: "eBrowser ${{ steps.version.outputs.tag }} — Security Fortress"
+          name: "eBrowser ${{ steps.version.outputs.tag }}"
           body: |
             ## eBrowser ${{ steps.version.outputs.tag }}
 
-            ### Performance
+            ### Downloads
+            | Platform | File |
+            |----------|------|
+            | Linux x86_64 | `ebrowser-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz` |
+            | Windows x86_64 | `ebrowser-${{ steps.version.outputs.tag }}-windows-x86_64.zip` |
+            | macOS x86_64 | `ebrowser-${{ steps.version.outputs.tag }}-macos-x86_64.tar.gz` |
+            | Reference Guide (PDF) | `eBrowser-guide.pdf` |
+
+            ### Highlights
             - **577K+ requests/sec** with 8-layer security pipeline
             - **16 µs** average request latency
-            - **0.2 MB** binary size
-            - **22 MB** memory footprint
-
-            ### Security
-            - Process sandbox (seccomp-BPF, namespaces)
-            - Hardened memory allocator (canaries, UAF detection)
-            - Application firewall (domain blocklist, CIDR, rate limiting)
-            - Anti-fingerprinting (4 levels incl. Tor-like)
-            - DNS-over-HTTPS (default) with DNSSEC
-            - Built-in tracker/ad blocker (EasyList compatible)
-            - URL tracking parameter stripping (25+ patterns)
-            - WebExtensions V3 API
-
-            ### Testing
-            - 138 unit tests — all passing
-            - Valgrind memory validation
-            - Static analysis (cppcheck)
-            - Performance benchmarks on every release
+            - Process sandbox, hardened allocator, application firewall
+            - Anti-fingerprinting, DNS-over-HTTPS, tracker/ad blocker
 
             See [CHANGELOG.md](CHANGELOG.md) for full details.
-          files: |
-            ebrowser-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz
+          files: final/*
           draft: false
           prerelease: false
 
-  # Docker image on release
+  # ═══════════════════════════════════════════════════
+  # 6. DOCKER RELEASE
+  # ═══════════════════════════════════════════════════
   docker-release:
     name: Docker Release
     runs-on: ubuntu-22.04
-    needs: build-and-release
+    needs: create-release
     steps:
       - uses: actions/checkout@v4
         with:
