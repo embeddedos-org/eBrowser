@@ -89,7 +89,7 @@ endif()
 # On Windows, ensure LVGL symbols are not decorated with dllimport/dllexport
 # when building as a static library (prevents __imp_ linker errors)
 if(WIN32 AND TARGET lvgl)
-    target_compile_definitions(lvgl PUBLIC lv_EXPORTS)
+    target_compile_definitions(lvgl PUBLIC LV_ATTRIBUTE_EXTERN_DATA=)
 endif()
 
 # --- Core engine ---
