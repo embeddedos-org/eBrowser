@@ -99,19 +99,33 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release/bin
           # Copy eBrowser executable
-          $exe = Get-ChildItem -Path build -Recurse -Include "eBrowser.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $exe = Get-ChildItem -Path build -Recurse -Filter "eBrowser.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($exe) { Copy-Item $exe.FullName -Destination release/bin/ }
-          # Copy required DLLs
-          Get-ChildItem -Path build -Recurse -Include *.dll -ErrorAction SilentlyContinue | ForEach-Object {
-            Copy-Item $_.FullName -Destination release/bin/
+          # Copy any DLLs from build tree
+          Get-ChildItem -Path build -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Copy-Item $_.FullName -Destination release/bin/ -Force
           }
-          # Copy vcpkg DLLs (SDL2, OpenSSL)
+          # Copy vcpkg runtime DLLs (SDL2, OpenSSL) — must be next to .exe
           $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
           if (Test-Path $vcpkgBin) {
-            Get-ChildItem -Path $vcpkgBin -Include "SDL2.dll","libssl*.dll","libcrypto*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
-              Copy-Item $_.FullName -Destination release/bin/
+            foreach ($pattern in @("SDL2.dll", "libssl*.dll", "libcrypto*.dll")) {
+              Get-ChildItem -Path $vcpkgBin -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object {
+                Copy-Item $_.FullName -Destination release/bin/ -Force
+                Write-Host "Copied: $($_.Name)"
+              }
             }
           }
+          # Verify SDL2.dll is present
+          if (-not (Test-Path "release/bin/SDL2.dll")) {
+            Write-Warning "SDL2.dll NOT found in release/bin — searching system..."
+            Get-ChildItem -Path "$env:VCPKG_INSTALLATION_ROOT" -Recurse -Filter "SDL2.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+              Copy-Item $_.FullName -Destination release/bin/ -Force
+              Write-Host "Found and copied: $($_.FullName)"
+            }
+          }
+          # List final contents
+          Write-Host "=== Release bin contents ==="
+          Get-ChildItem release/bin/ | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length/1KB)) KB)" }
           Copy-Item README.md, CHANGELOG.md, LICENSE -Destination release/ -ErrorAction SilentlyContinue
           Compress-Archive -Path release/* -DestinationPath "ebrowser-${{ github.ref_name }}-windows-x86_64.zip"
 
