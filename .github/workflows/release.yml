@@ -9,6 +9,9 @@ permissions:
   packages: write
 
 jobs:
+  # ===========================================================
+  # Linux: .deb package + AppImage
+  # ===========================================================
   build-linux:
     name: Build — Linux x86_64
     runs-on: ubuntu-22.04
@@ -21,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake libsdl2-dev
+          sudo apt-get install -y build-essential cmake libsdl2-dev libfuse2
 
       - name: Create include symlink
         run: ln -sf ebrowser include/eBrowser
@@ -30,6 +33,7 @@ jobs:
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr \
             -DBUILD_TESTING=ON \
             -DCMAKE_C_FLAGS="-O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE" \
             -DCMAKE_EXE_LINKER_FLAGS="-pie -Wl,-z,relro,-z,now"
@@ -41,32 +45,138 @@ jobs:
           ctest --output-on-failure \
             -R "test_memory_safety|test_sandbox|test_firewall|test_anti_fingerprint|test_extension|test_privacy|test_tab_manager|test_bookmark"
 
-      - name: Run benchmark
-        run: cd build/tests && ./benchmark 2>/dev/null | tee /tmp/benchmark.txt
-
-      - name: Run load test
-        run: cd build/tests && ./load_test_combined 2>/dev/null | tee /tmp/loadtest.txt
-
       - name: Strip binaries
         run: |
-          strip build/port/eBrowser build/tests/benchmark build/tests/load_test_combined 2>/dev/null || true
-          ls -lh build/port/eBrowser build/tests/benchmark build/tests/load_test_combined 2>/dev/null || true
+          strip build/port/eBrowser 2>/dev/null || true
 
-      - name: Package release artifacts
+      - name: Build .deb package
         run: |
-          mkdir -p release/bin release/tools
-          cp build/port/eBrowser release/bin/ 2>/dev/null || true
-          cp build/tests/benchmark release/tools/ 2>/dev/null || true
-          cp build/tests/load_test_combined release/tools/ 2>/dev/null || true
-          cp README.md CHANGELOG.md LICENSE release/
-          tar czf ebrowser-${{ github.ref_name }}-linux-x86_64.tar.gz -C release .
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          PKG_DIR="ebrowser_${VERSION}_amd64"
+          mkdir -p ${PKG_DIR}/DEBIAN
+          mkdir -p ${PKG_DIR}/usr/bin
+          mkdir -p ${PKG_DIR}/usr/share/applications
+          mkdir -p ${PKG_DIR}/usr/share/icons/hicolor/256x256/apps
+          mkdir -p ${PKG_DIR}/usr/share/doc/ebrowser
 
-      - name: Upload artifact
+          # Binary
+          cp build/port/eBrowser ${PKG_DIR}/usr/bin/ebrowser
+
+          # Desktop entry
+          cat > ${PKG_DIR}/usr/share/applications/ebrowser.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=eBrowser
+          Comment=The Most Secure Lightweight Browser
+          Exec=ebrowser %u
+          Icon=ebrowser
+          Type=Application
+          Categories=Network;WebBrowser;
+          MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+          StartupNotify=true
+          DESKTOP
+          # Fix indentation
+          sed -i 's/^          //' ${PKG_DIR}/usr/share/applications/ebrowser.desktop
+
+          # Icon (convert SVG to PNG)
+          if command -v convert &>/dev/null; then
+            convert assets/logo.svg -resize 256x256 ${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/ebrowser.png 2>/dev/null || true
+          fi
+
+          # Docs
+          cp README.md CHANGELOG.md LICENSE ${PKG_DIR}/usr/share/doc/ebrowser/
+
+          # Control file
+          cat > ${PKG_DIR}/DEBIAN/control << EOF
+          Package: ebrowser
+          Version: ${VERSION}
+          Section: web
+          Priority: optional
+          Architecture: amd64
+          Depends: libsdl2-2.0-0 (>= 2.0.0), libc6 (>= 2.17)
+          Maintainer: EmbeddedOS <info@embeddedos.org>
+          Homepage: https://github.com/embeddedos-org/eBrowser
+          Description: eBrowser — The Most Secure Lightweight Browser
+           A security-focused embedded browser with process sandboxing,
+           hardened memory allocator, application firewall, anti-fingerprinting,
+           DNS-over-HTTPS, built-in tracker blocker, and WebExtensions V3 support.
+          EOF
+          sed -i 's/^          //' ${PKG_DIR}/DEBIAN/control
+
+          dpkg-deb --build --root-owner-group ${PKG_DIR}
+          mv ${PKG_DIR}.deb eBrowser-${VERSION}-linux-x86_64.deb
+          echo "=== .deb package ==="
+          ls -lh eBrowser-${VERSION}-linux-x86_64.deb
+
+      - name: Build AppImage
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
+          # Download appimagetool
+          curl -fsSL -o appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+
+          # Create AppDir structure
+          mkdir -p eBrowser.AppDir/usr/bin
+          mkdir -p eBrowser.AppDir/usr/share/applications
+          mkdir -p eBrowser.AppDir/usr/share/icons/hicolor/256x256/apps
+
+          cp build/port/eBrowser eBrowser.AppDir/usr/bin/ebrowser
+
+          # Desktop file
+          cat > eBrowser.AppDir/ebrowser.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=eBrowser
+          Comment=The Most Secure Lightweight Browser
+          Exec=ebrowser %u
+          Icon=ebrowser
+          Type=Application
+          Categories=Network;WebBrowser;
+          DESKTOP
+          sed -i 's/^          //' eBrowser.AppDir/ebrowser.desktop
+          cp eBrowser.AppDir/ebrowser.desktop eBrowser.AppDir/usr/share/applications/
+
+          # Icon
+          if command -v convert &>/dev/null; then
+            convert assets/logo.svg -resize 256x256 eBrowser.AppDir/ebrowser.png 2>/dev/null || \
+              cp assets/logo.svg eBrowser.AppDir/ebrowser.svg
+          else
+            cp assets/logo.svg eBrowser.AppDir/ebrowser.svg
+          fi
+
+          # AppRun
+          cat > eBrowser.AppDir/AppRun << 'APPRUN'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          HERE=${SELF%/*}
+          exec "${HERE}/usr/bin/ebrowser" "$@"
+          APPRUN
+          chmod +x eBrowser.AppDir/AppRun
+
+          # Build AppImage
+          ARCH=x86_64 ./appimagetool eBrowser.AppDir eBrowser-${VERSION}-x86_64.AppImage 2>/dev/null || true
+          if [ -f "eBrowser-${VERSION}-x86_64.AppImage" ]; then
+            echo "=== AppImage ==="
+            ls -lh eBrowser-${VERSION}-x86_64.AppImage
+          fi
+
+      - name: Upload .deb
         uses: actions/upload-artifact@v4
         with:
-          name: ebrowser-linux-x86_64
-          path: ebrowser-${{ github.ref_name }}-linux-x86_64.tar.gz
+          name: ebrowser-linux-deb
+          path: eBrowser-*-linux-x86_64.deb
 
+      - name: Upload AppImage
+        if: ${{ hashFiles('eBrowser-*-x86_64.AppImage') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ebrowser-linux-appimage
+          path: eBrowser-*-x86_64.AppImage
+
+  # ===========================================================
+  # Windows: Installer .exe (Inno Setup)
+  # ===========================================================
   build-windows:
     name: Build — Windows x86_64
     runs-on: windows-latest
@@ -94,7 +204,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build --config Release --parallel
 
-      - name: Package release artifacts
+      - name: Stage release files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release/bin
@@ -105,7 +215,7 @@ jobs:
           Get-ChildItem -Path build -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | ForEach-Object {
             Copy-Item $_.FullName -Destination release/bin/ -Force
           }
-          # Copy vcpkg runtime DLLs (SDL2, OpenSSL) — must be next to .exe
+          # Copy vcpkg runtime DLLs
           $vcpkgBin = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
           if (Test-Path $vcpkgBin) {
             foreach ($pattern in @("SDL2.dll", "libssl*.dll", "libcrypto*.dll")) {
@@ -115,26 +225,55 @@ jobs:
               }
             }
           }
-          # Verify SDL2.dll is present
+          # Fallback search for SDL2.dll
           if (-not (Test-Path "release/bin/SDL2.dll")) {
-            Write-Warning "SDL2.dll NOT found in release/bin — searching system..."
-            Get-ChildItem -Path "$env:VCPKG_INSTALLATION_ROOT" -Recurse -Filter "SDL2.dll" -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Warning "SDL2.dll NOT found — searching system..."
+            Get-ChildItem -Path "$env:VCPKG_INSTALLATION_ROOT" -Recurse -Filter "SDL2.dll" -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object {
               Copy-Item $_.FullName -Destination release/bin/ -Force
               Write-Host "Found and copied: $($_.FullName)"
             }
           }
-          # List final contents
           Write-Host "=== Release bin contents ==="
           Get-ChildItem release/bin/ | ForEach-Object { Write-Host "  $($_.Name) ($([math]::Round($_.Length/1KB)) KB)" }
           Copy-Item README.md, CHANGELOG.md, LICENSE -Destination release/ -ErrorAction SilentlyContinue
-          Compress-Archive -Path release/* -DestinationPath "ebrowser-${{ github.ref_name }}-windows-x86_64.zip"
 
-      - name: Upload artifact
+      - name: Generate icon
+        shell: pwsh
+        run: |
+          if (Test-Path "assets/logo.svg") {
+            magick convert "assets/logo.svg" -resize 256x256 "assets/logo.ico" 2>$null
+            if (Test-Path "assets/logo.ico") { Write-Host "Generated logo.ico" }
+          }
+
+      - name: Build Installer
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          if (Test-Path "assets/logo.ico") {
+            iscc "/DEBROWSER_VERSION=$version" "installer/windows/ebrowser-setup.iss"
+          } else {
+            $content = Get-Content "installer/windows/ebrowser-setup.iss" | Where-Object { $_ -notmatch 'SetupIconFile=' }
+            $content | Set-Content "installer/windows/ebrowser-setup-noico.iss"
+            iscc "/DEBROWSER_VERSION=$version" "installer/windows/ebrowser-setup-noico.iss"
+          }
+          # Rename to include version
+          $installer = Get-ChildItem -Path build/installer -Filter "*.exe" | Select-Object -First 1
+          if ($installer) {
+            $newName = "eBrowser-$version-Setup-x64.exe"
+            Copy-Item $installer.FullName -Destination $newName
+            Write-Host "=== Installer ==="
+            Write-Host "  $newName ($([math]::Round((Get-Item $newName).Length/1MB, 1)) MB)"
+          }
+
+      - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
-          name: ebrowser-windows-x86_64
-          path: ebrowser-${{ github.ref_name }}-windows-x86_64.zip
+          name: ebrowser-windows-installer
+          path: eBrowser-*-Setup-x64.exe
 
+  # ===========================================================
+  # macOS: .dmg disk image
+  # ===========================================================
   build-macos-arm64:
     name: Build — macOS arm64
     runs-on: macos-latest
@@ -146,6 +285,9 @@ jobs:
       - name: Install dependencies
         run: brew install sdl2
 
+      - name: Create include symlink
+        run: ln -sf ebrowser include/eBrowser 2>/dev/null || true
+
       - name: Build Release
         continue-on-error: true
         run: |
@@ -155,22 +297,135 @@ jobs:
             -DCMAKE_PREFIX_PATH=$(brew --prefix)
           cmake --build build --parallel $(sysctl -n hw.ncpu)
 
-      - name: Package release artifacts
+      - name: Create .app bundle
         run: |
-          mkdir -p release/bin
-          cp build/port/eBrowser release/bin/ 2>/dev/null || true
-          # Copy any dylibs
-          find build -maxdepth 3 -type f -name "*.dylib" \
-            -exec cp {} release/bin/ \; 2>/dev/null || true
-          cp README.md CHANGELOG.md LICENSE release/ 2>/dev/null || true
-          tar czf ebrowser-${{ github.ref_name }}-macos-arm64.tar.gz -C release .
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          APP="eBrowser.app"
 
-      - name: Upload artifact
+          mkdir -p "${APP}/Contents/MacOS"
+          mkdir -p "${APP}/Contents/Resources"
+          mkdir -p "${APP}/Contents/Frameworks"
+
+          # Binary
+          cp build/port/eBrowser "${APP}/Contents/MacOS/eBrowser" 2>/dev/null || true
+
+          # Copy SDL2 framework/dylib
+          SDL2_LIB=$(brew --prefix sdl2)/lib
+          if [ -d "${SDL2_LIB}" ]; then
+            cp ${SDL2_LIB}/libSDL2*.dylib "${APP}/Contents/Frameworks/" 2>/dev/null || true
+            # Fix rpath
+            for dylib in "${APP}"/Contents/Frameworks/libSDL2*.dylib; do
+              install_name_tool -id "@executable_path/../Frameworks/$(basename $dylib)" "$dylib" 2>/dev/null || true
+            done
+            if [ -f "${APP}/Contents/MacOS/eBrowser" ]; then
+              install_name_tool -add_rpath "@executable_path/../Frameworks" "${APP}/Contents/MacOS/eBrowser" 2>/dev/null || true
+            fi
+          fi
+
+          # Info.plist
+          cat > "${APP}/Contents/Info.plist" << PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>eBrowser</string>
+            <key>CFBundleIdentifier</key>
+            <string>org.embeddedos.ebrowser</string>
+            <key>CFBundleName</key>
+            <string>eBrowser</string>
+            <key>CFBundleDisplayName</key>
+            <string>eBrowser</string>
+            <key>CFBundleVersion</key>
+            <string>${VERSION}</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${VERSION}</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleSignature</key>
+            <string>eBrw</string>
+            <key>CFBundleIconFile</key>
+            <string>AppIcon</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>12.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>CFBundleDocumentTypes</key>
+            <array>
+              <dict>
+                <key>CFBundleTypeRole</key>
+                <string>Viewer</string>
+                <key>CFBundleTypeName</key>
+                <string>HTML Document</string>
+                <key>CFBundleTypeExtensions</key>
+                <array>
+                  <string>html</string>
+                  <string>htm</string>
+                </array>
+                <key>LSHandlerRank</key>
+                <string>Alternate</string>
+              </dict>
+            </array>
+            <key>CFBundleURLTypes</key>
+            <array>
+              <dict>
+                <key>CFBundleURLSchemes</key>
+                <array>
+                  <string>http</string>
+                  <string>https</string>
+                </array>
+                <key>CFBundleURLName</key>
+                <string>Web URL</string>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          PLIST
+
+          # Generate icns from SVG
+          if command -v sips &>/dev/null && [ -f assets/logo.svg ]; then
+            mkdir -p AppIcon.iconset
+            for size in 16 32 64 128 256 512; do
+              sips -z $size $size assets/logo.svg --out "AppIcon.iconset/icon_${size}x${size}.png" 2>/dev/null || true
+              double=$((size * 2))
+              sips -z $double $double assets/logo.svg --out "AppIcon.iconset/icon_${size}x${size}@2x.png" 2>/dev/null || true
+            done
+            iconutil -c icns AppIcon.iconset -o "${APP}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+          fi
+
+          echo "=== App bundle ==="
+          find "${APP}" -type f | head -20
+
+      - name: Create DMG
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          DMG_NAME="eBrowser-${VERSION}-macOS-arm64.dmg"
+
+          # Create DMG with Applications symlink
+          mkdir -p dmg_contents
+          cp -R eBrowser.app dmg_contents/
+          ln -s /Applications dmg_contents/Applications
+          cp README.md dmg_contents/ 2>/dev/null || true
+
+          hdiutil create -volname "eBrowser ${VERSION}" \
+            -srcfolder dmg_contents \
+            -ov -format UDZO \
+            "${DMG_NAME}"
+
+          echo "=== DMG ==="
+          ls -lh "${DMG_NAME}"
+
+      - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: ebrowser-macos-arm64
-          path: ebrowser-${{ github.ref_name }}-macos-arm64.tar.gz
+          name: ebrowser-macos-dmg
+          path: eBrowser-*-macOS-arm64.dmg
 
+  # ===========================================================
+  # Book PDF
+  # ===========================================================
   build-pdf:
     name: Build Book PDF
     runs-on: ubuntu-latest
@@ -237,6 +492,9 @@ jobs:
           name: book-pdf
           path: eBrowser-guide.pdf
 
+  # ===========================================================
+  # Create GitHub Release with installers
+  # ===========================================================
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
@@ -259,9 +517,9 @@ jobs:
       - name: Collect release files
         run: |
           mkdir -p final
-          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.pdf" \) \
+          find artifacts -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.pdf" \) \
             -exec cp {} final/ \;
-          echo "Release assets:"
+          echo "=== Release assets ==="
           ls -lh final/
 
       - name: Create GitHub Release
@@ -272,25 +530,33 @@ jobs:
           body: |
             ## eBrowser ${{ steps.version.outputs.tag }}
 
-            ### Downloads
-            | Platform | Architecture | File |
-            |----------|-------------|------|
-            | Linux | x86_64 | `ebrowser-${{ steps.version.outputs.tag }}-linux-x86_64.tar.gz` |
-            | Windows | x86_64 | `ebrowser-${{ steps.version.outputs.tag }}-windows-x86_64.zip` |
-            | macOS | Apple Silicon (arm64) | `ebrowser-${{ steps.version.outputs.tag }}-macos-arm64.tar.gz` |
-            | Reference Guide | PDF | `eBrowser-guide.pdf` |
+            ### Install
+
+            | Platform | Download | Install |
+            |----------|----------|---------|
+            | **Windows** | `eBrowser-Setup-x64.exe` | Run the installer |
+            | **macOS** (Apple Silicon) | `eBrowser-macOS-arm64.dmg` | Open DMG, drag to Applications |
+            | **Linux** (Debian/Ubuntu) | `eBrowser-linux-x86_64.deb` | `sudo dpkg -i eBrowser-*.deb` |
+            | **Linux** (Any distro) | `eBrowser-x86_64.AppImage` | `chmod +x eBrowser-*.AppImage && ./eBrowser-*.AppImage` |
+            | **Reference Guide** | `eBrowser-guide.pdf` | |
 
             ### Highlights
-            - **577K+ requests/sec** with 8-layer security pipeline
-            - **16 µs** average request latency
-            - Process sandbox, hardened allocator, application firewall
-            - Anti-fingerprinting, DNS-over-HTTPS, tracker/ad blocker
+            - Process sandbox (seccomp-BPF + namespaces)
+            - Hardened memory allocator (canaries, UAF detection)
+            - Application firewall (domain blocklist, CIDR, rate limiting)
+            - Anti-fingerprinting (4 levels incl. Tor-like)
+            - DNS-over-HTTPS with DNSSEC
+            - Built-in tracker/ad blocker (EasyList compatible)
+            - WebExtensions V3 API
 
             See [CHANGELOG.md](CHANGELOG.md) for full details.
           files: final/*
           draft: false
           prerelease: false
 
+  # ===========================================================
+  # Docker
+  # ===========================================================
   docker-release:
     name: Docker Release
     runs-on: ubuntu-22.04
