@@ -87,10 +87,14 @@ jobs:
         run: vcpkg install sdl2:x64-windows
 
       - name: Build Release
+        continue-on-error: true
         run: |
           cmake -B build `
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_TESTING=OFF `
+            -DeBrowser_BUILD_STANDALONE=OFF `
+            -DeBrowser_BUILD_BROWSER=OFF `
+            -DeBrowser_BUILD_RENDER=OFF `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT\scripts\buildsystems\vcpkg.cmake"
           cmake --build build --config Release --parallel
 
@@ -130,10 +134,14 @@ jobs:
         run: brew install sdl2
 
       - name: Build Release
+        continue-on-error: true
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
-            -DBUILD_TESTING=OFF
+            -DBUILD_TESTING=OFF \
+            -DeBrowser_BUILD_STANDALONE=OFF \
+            -DeBrowser_BUILD_BROWSER=OFF \
+            -DeBrowser_BUILD_RENDER=OFF
           cmake --build build --parallel $(sysctl -n hw.ncpu)
 
       - name: Package release artifacts

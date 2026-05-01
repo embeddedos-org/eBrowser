@@ -75,8 +75,9 @@ else()
     )
     set(LV_USE_DRAW_SW_ASM "none" CACHE STRING "" FORCE)
     FetchContent_MakeAvailable(lvgl)
-    # Remove ARM assembly files on non-ARM platforms (x86/x64)
-    if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64|ARM")
+    # Remove ARM assembly files on Apple or non-ARM platforms
+    # Apple's assembler can't handle LVGL's Helium/NEON .S files
+    if(APPLE OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm|aarch64|ARM")
         get_target_property(_lvgl_srcs lvgl SOURCES)
         if(_lvgl_srcs)
             list(FILTER _lvgl_srcs EXCLUDE REGEX "\\.S$")
