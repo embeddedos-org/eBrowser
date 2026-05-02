@@ -25,4 +25,9 @@ size_t             eb_platform_available_memory(void);
 bool               eb_platform_file_exists(const char *path);
 int                eb_platform_read_file(const char *path, char **out_buf, size_t *out_len);
 
+/* Cross-platform "open URL in the user's default system browser".
+ * Implementation lives in port/<platform>/platform_open_url.c.
+ * Returns true on success. */
+bool               eb_platform_open_url_in_system_browser(const char *url);
+
 #endif /* eBrowser_PLATFORM_H */

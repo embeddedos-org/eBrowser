@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 project(eBrowser
-    VERSION 2.0.0
+    VERSION 2.0.2
     DESCRIPTION "eBrowser - The Most Secure & Powerful Lightweight Browser"
     LANGUAGES C
 )

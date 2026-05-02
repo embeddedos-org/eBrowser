@@ -1,5 +1,8 @@
 if(eBrowser_PLATFORM_SDL2 AND eBrowser_BUILD_STANDALONE)
-    add_executable(eBrowser ${CMAKE_CURRENT_SOURCE_DIR}/sdl2/main_sdl2.c)
+    add_executable(eBrowser
+        ${CMAKE_CURRENT_SOURCE_DIR}/sdl2/main_sdl2.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/sdl2/platform_open_url.c
+    )
     target_link_libraries(eBrowser PRIVATE eBrowser_browser lvgl)
     target_include_directories(eBrowser PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
