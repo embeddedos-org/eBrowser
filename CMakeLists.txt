@@ -8,6 +8,14 @@ project(eBrowser
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# --- Generate eb_version.h from CMake project version (single source of truth) ---
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/extern/eb_version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/eb_version.h
+    @ONLY
+)
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/generated)
+
 # --- Feature flags ---
 option(eBrowser_BUILD_ENGINE    "Build HTML/CSS/Layout engine"           ON)
 option(eBrowser_BUILD_RENDER    "Build rendering backend"                ON)

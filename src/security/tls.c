@@ -6,6 +6,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* mbedtls 3.x moved OID constants out of public umbrella headers and made some
+ * x509 fields PRIVATE. Pull these in explicitly so newer toolchains compile. */
+#ifdef EB_USE_MBEDTLS
+#include "mbedtls/oid.h"
+#include "mbedtls/x509_crt.h"
+#ifndef MBEDTLS_PRIVATE
+#define MBEDTLS_PRIVATE(member) member
+#endif
+#endif
+
 eb_tls_config_t eb_tls_config_default(void) {
     eb_tls_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
@@ -181,7 +191,7 @@ int eb_tls_handshake(eb_tls_ctx_t *ctx, int socket_fd) {
 
             ec->raw_data = cur->raw.p;
             ec->raw_len = cur->raw.len;
-            ec->is_ca = cur->ca_istrue != 0;
+            ec->is_ca = cur->MBEDTLS_PRIVATE(ca_istrue) != 0;
 
             /* Compute SHA-256 fingerprint */
             eb_sha256(cur->raw.p, cur->raw.len, ec->fingerprint_sha256);

@@ -18,13 +18,15 @@ typedef struct {
 
 typedef struct {
     lv_obj_t   *root;
+    lv_obj_t   *tab_bar;       /* Top strip — Chrome-style tabs above the toolbar */
     lv_obj_t   *toolbar;
     lv_obj_t   *back_btn;
     lv_obj_t   *forward_btn;
     lv_obj_t   *reload_btn;
     lv_obj_t   *home_btn;
     lv_obj_t   *url_bar;
-    lv_obj_t   *tab_bar;
+    lv_obj_t   *menu_btn;      /* Hamburger menu (☰) — Chrome-style */
+    lv_obj_t   *menu_dropdown; /* lv_dropdown driven by menu_btn (kept for reference) */
     lv_obj_t   *page_area;
     lv_obj_t   *status_bar;
     lv_obj_t   *status_label;
@@ -34,6 +36,7 @@ typedef struct {
     char        history[EB_BROWSER_MAX_HISTORY][EB_BROWSER_MAX_URL];
     int         history_count;
     int         history_pos;
+    bool        quit_requested; /* Set by the in-app Quit menu; main loop polls this. */
 } eb_browser_t;
 
 bool eb_browser_init(eb_browser_t *browser, lv_obj_t *parent);
@@ -47,5 +50,9 @@ int  eb_browser_new_tab(eb_browser_t *browser);
 void eb_browser_close_tab(eb_browser_t *browser, int index);
 void eb_browser_switch_tab(eb_browser_t *browser, int index);
 void eb_browser_set_status(eb_browser_t *browser, const char *text);
+
+/* Rebuilds the visible tab strip from browser->tabs[]. Public so other code paths
+ * (e.g., tests, future extensions) can refresh after mutating the tab list. */
+void eb_browser_refresh_tabs(eb_browser_t *browser);
 
 #endif /* eBrowser_BROWSER_H */
