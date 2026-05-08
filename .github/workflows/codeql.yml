@@ -23,11 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           submodules: recursive
+      - name: Install build dependencies (SDL2 etc.)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev cmake build-essential
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@v3
         with:
           languages: c-cpp
       - name: Build
@@ -35,6 +39,6 @@ jobs:
           cmake -B build
           cmake --build build --parallel
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v3
         with:
           category: "/language:c-cpp"

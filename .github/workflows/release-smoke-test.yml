@@ -11,6 +11,13 @@ on:
         description: 'Release tag to test (e.g. v0.3.2)'
         required: true
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   # ===========================================================
   # Test Windows installer

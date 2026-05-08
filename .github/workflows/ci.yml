@@ -15,6 +15,9 @@ concurrency:
 env:
   BUILD_TYPE: Release
 
+permissions:
+  contents: read
+
 jobs:
   # ===========================================================
   # Job 1: Build & Unit Tests (multi-platform)
@@ -22,7 +25,6 @@ jobs:
   build-test:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -127,7 +129,6 @@ jobs:
   security-build:
     name: Security Hardened Build
     runs-on: ubuntu-22.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -186,7 +187,6 @@ jobs:
   benchmark:
     name: Performance Benchmark
     runs-on: ubuntu-22.04
-    continue-on-error: true
     needs: build-test
     steps:
       - uses: actions/checkout@v4
@@ -234,7 +234,6 @@ jobs:
   memory-check:
     name: Memory Safety (Valgrind)
     runs-on: ubuntu-22.04
-    continue-on-error: true
     needs: build-test
     steps:
       - uses: actions/checkout@v4
@@ -273,7 +272,6 @@ jobs:
   static-analysis:
     name: Static Analysis
     runs-on: ubuntu-22.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -301,7 +299,6 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-22.04
-    continue-on-error: true
     needs: build-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
@@ -313,7 +310,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: enterprise/docker/Dockerfile
