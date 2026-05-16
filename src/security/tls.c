@@ -6,6 +6,29 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+/* ============================================================================
+ * !!! DEVELOPMENT-STUB WARNING (when EB_USE_MBEDTLS is not defined) !!!
+ *
+ * When this file is compiled WITHOUT -DEB_USE_MBEDTLS, the
+ * `eb_tls_handshake`, `eb_tls_write`, and `eb_tls_read` functions are STUBS
+ * that perform NO real cryptographic negotiation, encryption, or I/O.
+ * Any HTTPS connection routed through them will be effectively cleartext
+ * (and currently will not even reach the wire).
+ *
+ * Production builds MUST be configured with:
+ *     cmake -DEB_USE_MBEDTLS=ON -DEB_TLS_REAL=1 ...
+ *
+ * The #warning below makes this very visible at every compile so the stub
+ * cannot be shipped accidentally.
+ * ========================================================================== */
+#if !defined(EB_USE_MBEDTLS) && (!defined(EB_TLS_REAL) || EB_TLS_REAL == 0)
+#  if defined(__GNUC__) || defined(__clang__)
+#    warning "eBrowser TLS is the DEVELOPMENT STUB (no real crypto). Configure with -DEB_USE_MBEDTLS=ON for production."
+#  elif defined(_MSC_VER)
+#    pragma message("WARNING: eBrowser TLS is the DEVELOPMENT STUB (no real crypto). Configure with -DEB_USE_MBEDTLS=ON for production.")
+#  endif
+#endif
+
 /* mbedtls 3.x moved OID constants out of public umbrella headers and made some
  * x509 fields PRIVATE. Pull these in explicitly so newer toolchains compile. */
 #ifdef EB_USE_MBEDTLS
