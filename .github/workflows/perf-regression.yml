@@ -70,7 +70,7 @@ jobs:
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
 
       - name: Upload performance data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: perf-results-${{ github.sha }}
           path: /tmp/perf.json
