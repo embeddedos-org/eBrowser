@@ -1,0 +1,124 @@
+{
+  "manifest_version": 3,
+  "name": "eBrowser",
+  "short_name": "eBrowser",
+  "version": "2.0.0",
+  "description": "The World's Most Powerful Browser — privacy, speed, and all features in one.",
+  "author": "EmbeddedOS Organization",
+  "homepage_url": "https://github.com/embeddedos-org/eBrowser",
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "eBrowser"
+  },
+
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "storage",
+    "history",
+    "bookmarks",
+    "downloads",
+    "notifications",
+    "contextMenus",
+    "webNavigation",
+    "scripting",
+    "alarms",
+    "cookies",
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "geolocation"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "tracker_rules",
+        "enabled": true,
+        "path": "rules/tracker_rules.json"
+      },
+      {
+        "id": "ad_rules",
+        "enabled": true,
+        "path": "rules/ad_rules.json"
+      }
+    ]
+  },
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["src/injected.js", "icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "default_locale": "en",
+
+  "minimum_chrome_version": "109",
+
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Open eBrowser"
+    },
+    "toggle-privacy": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P"
+      },
+      "description": "Toggle Privacy Mode"
+    },
+    "new-incognito": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+N"
+      },
+      "description": "New Incognito Tab"
+    }
+  }
+}

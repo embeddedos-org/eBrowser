@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Tab — eBrowser</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #6366f1;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+    }
+    .dark {
+      --bg: #0f0f1a;
+      --card: #1e1e2e;
+      --text: #cdd6f4;
+      --muted: #6c7086;
+      --border: #313244;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 60px 20px 40px;
+    }
+
+    /* Clock */
+    .clock { font-size: 72px; font-weight: 200; letter-spacing: -2px; margin-bottom: 8px; }
+    .date { font-size: 18px; color: var(--muted); margin-bottom: 48px; }
+
+    /* Search */
+    .search-container { width: 100%; max-width: 580px; margin-bottom: 48px; }
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 50px;
+      padding: 14px 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 4px 20px rgba(99,102,241,0.2);
+    }
+    .search-icon { font-size: 18px; flex-shrink: 0; }
+    .search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 16px;
+      background: transparent;
+      color: var(--text);
+    }
+    .search-input::placeholder { color: var(--muted); }
+    .search-btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .search-btn:hover { opacity: 0.9; }
+
+    /* Quick sites */
+    .sites-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 48px;
+    }
+    @media (max-width: 600px) { .sites-grid { grid-template-columns: repeat(4, 1fr); } }
+    .site-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .site-icon {
+      width: 52px; height: 52px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .site-item:hover .site-icon {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+    }
+    .site-name { font-size: 11px; color: var(--muted); text-align: center; }
+
+    /* Footer */
+    .footer {
+      margin-top: auto;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .footer a { color: var(--muted); text-decoration: none; }
+    .footer a:hover { color: var(--primary); }
+  </style>
+</head>
+<body>
+  <div class="clock" id="clock">00:00</div>
+  <div class="date" id="date">Loading...</div>
+
+  <div class="search-container">
+    <form class="search-box" id="search-form">
+      <span class="search-icon">🔍</span>
+      <input
+        class="search-input"
+        id="search-input"
+        type="text"
+        placeholder="Search the web or enter URL..."
+        autocomplete="off"
+        autofocus
+      />
+      <button class="search-btn" type="submit">Search</button>
+    </form>
+  </div>
+
+  <div class="sites-grid" id="sites-grid">
+    <!-- Populated by JS -->
+  </div>
+
+  <div class="footer">
+    <span>eBrowser v2.0.0</span>
+    <a href="https://github.com/embeddedos-org/eBrowser" target="_blank">GitHub</a>
+    <a href="#" id="toggle-theme">🌙 Dark Mode</a>
+  </div>
+
+  <script>
+    // Clock
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('date').textContent = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // Theme
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (prefersDark) document.body.classList.add('dark');
+    document.getElementById('toggle-theme').addEventListener('click', (e) => {
+      e.preventDefault();
+      document.body.classList.toggle('dark');
+    });
+
+    // Quick sites
+    const SITES = [
+      { name: 'Google', icon: '🔍', url: 'https://google.com' },
+      { name: 'GitHub', icon: '🐙', url: 'https://github.com' },
+      { name: 'YouTube', icon: '▶️', url: 'https://youtube.com' },
+      { name: 'Twitter', icon: '🐦', url: 'https://twitter.com' },
+      { name: 'Reddit', icon: '🤖', url: 'https://reddit.com' },
+      { name: 'Wikipedia', icon: '📚', url: 'https://wikipedia.org' },
+      { name: 'Amazon', icon: '📦', url: 'https://amazon.com' },
+      { name: 'OpenAI', icon: '🤖', url: 'https://openai.com' },
+    ];
+    const grid = document.getElementById('sites-grid');
+    SITES.forEach(site => {
+      const a = document.createElement('a');
+      a.href = site.url;
+      a.className = 'site-item';
+      a.innerHTML = `<div class="site-icon">${site.icon}</div><div class="site-name">${site.name}</div>`;
+      grid.appendChild(a);
+    });
+
+    // Search
+    document.getElementById('search-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = document.getElementById('search-input').value.trim();
+      if (!query) return;
+      const { settings } = await chrome.storage.local.get('settings');
+      const engine = settings?.searchEngine || 'google';
+      const ENGINES = {
+        google: 'https://www.google.com/search?q=',
+        bing: 'https://www.bing.com/search?q=',
+        duckduckgo: 'https://duckduckgo.com/?q=',
+        brave: 'https://search.brave.com/search?q=',
+        ecosia: 'https://www.ecosia.org/search?q=',
+      };
+      const isUrl = /^https?:\/\//.test(query) || /^[a-z0-9-]+\.[a-z]{2,}/.test(query);
+      const url = isUrl ? (query.startsWith('http') ? query : 'https://' + query) : (ENGINES[engine] || ENGINES.google) + encodeURIComponent(query);
+      window.location.href = url;
+    });
+  </script>
+</body>
+</html>

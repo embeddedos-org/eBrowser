@@ -1,0 +1,135 @@
+{
+  "expo": {
+    "name": "eBrowser",
+    "slug": "ebrowser",
+    "version": "2.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "ebrowser",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6366f1"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/ebrowser"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.embeddedos.ebrowser",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "eBrowser uses the camera for QR code scanning and media capture.",
+        "NSMicrophoneUsageDescription": "eBrowser uses the microphone for voice search and media recording.",
+        "NSLocationWhenInUseUsageDescription": "eBrowser uses your location for location-based features and GPS navigation.",
+        "NSLocationAlwaysUsageDescription": "eBrowser uses your location for background location features.",
+        "NSPhotoLibraryUsageDescription": "eBrowser accesses your photo library for file uploads.",
+        "NSPhotoLibraryAddUsageDescription": "eBrowser saves files to your photo library.",
+        "NSFaceIDUsageDescription": "eBrowser uses Face ID to protect your saved passwords.",
+        "NSContactsUsageDescription": "eBrowser accesses contacts for autofill suggestions.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.associated-domains": ["applinks:ebrowser.app"]
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6366f1"
+      },
+      "package": "org.embeddedos.ebrowser",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "DOWNLOAD_WITHOUT_NOTIFICATION",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE",
+        "CHANGE_NETWORK_STATE",
+        "NFC",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "ebrowser.app" },
+            { "scheme": "http", "host": "ebrowser.app" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        },
+        {
+          "action": "VIEW",
+          "data": [{ "scheme": "ebrowser" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow eBrowser to use your location for GPS features.",
+          "locationAlwaysPermission": "Allow eBrowser to use your location in the background.",
+          "locationWhenInUsePermission": "Allow eBrowser to use your location while using the app.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow eBrowser to access your camera.",
+          "microphonePermission": "Allow eBrowser to access your microphone.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6366f1",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ebrowser-project-id"
+      },
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}

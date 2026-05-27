@@ -412,3 +412,136 @@ MIT License - see [LICENSE](LICENSE) for details.
 <p align="center">
   <strong>eBrowser v2.0</strong> - Built for security. Designed for speed. Made for everyone.
 </p>
+
+---
+
+## 🌐 Web Application (PWA)
+
+The `web-app/` directory contains a full-featured Progressive Web App browser built with **React 18 + TypeScript + Vite**.
+
+### Features
+- **Multi-tab management** with drag-and-drop, pinning, muting, and tab groups
+- **Smart address bar** with URL/search autocomplete and history suggestions
+- **12 languages** with full RTL support (Arabic, Hebrew, etc.)
+- **Privacy dashboard** — tracker/ad blocking, HTTPS-only, DoH, GPC, DNT, anti-fingerprinting
+- **Password manager** with encrypted storage
+- **Notes** — in-browser note-taking linked to pages
+- **Reading List** — save articles for later
+- **GPS & Location** — full geolocation API integration
+- **DevTools** — Console, Elements, Network, Storage, Sources, Debugger panels
+- **Extensions system** — WebExtensions V3 compatible
+- **Command Palette** (Ctrl+K) — quick command launcher
+- **Find in Page** (Ctrl+F)
+- **Zen Mode** — distraction-free fullscreen
+- **PWA** — installable, offline-capable, push notifications
+
+### Quick Start
+
+```bash
+cd web-app
+npm install
+npm run dev        # Development server at http://localhost:5173
+npm run build      # Production build to dist/
+npm run preview    # Preview production build
+```
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+T` | New Tab |
+| `Ctrl+W` | Close Tab |
+| `Ctrl+Shift+N` | New Incognito Tab |
+| `Ctrl+Tab` | Next Tab |
+| `Ctrl+L` / `F6` | Focus Address Bar |
+| `Ctrl+R` / `F5` | Reload |
+| `Ctrl+H` | History |
+| `Ctrl+J` | Downloads |
+| `Ctrl+D` | Bookmark Page |
+| `Ctrl+F` | Find in Page |
+| `Ctrl+K` | Command Palette |
+| `F11` | Fullscreen |
+| `F12` | DevTools |
+
+### Internal Pages
+
+| URL | Description |
+|---|---|
+| `about:newtab` | New Tab with search, top sites, news |
+| `ebrowser://settings` | Full settings |
+| `ebrowser://history` | Browsing history |
+| `ebrowser://bookmarks` | Bookmark manager |
+| `ebrowser://downloads` | Download manager |
+| `ebrowser://extensions` | Extension manager |
+| `ebrowser://privacy` | Privacy dashboard |
+| `ebrowser://passwords` | Password manager |
+| `ebrowser://notes` | Notes |
+| `ebrowser://reading-list` | Reading list |
+| `ebrowser://gps` | GPS & Location |
+
+---
+
+## 🔌 Browser Extension (Manifest V3)
+
+The `extension/` directory contains a **Manifest V3** browser extension compatible with Chrome, Edge, Brave, and Firefox.
+
+### Features
+- **Tracker blocking** — 20+ tracker domains via `declarativeNetRequest`
+- **Ad blocking** — 10+ ad network domains
+- **Privacy controls** — GPC, DNT, HTTPS-only, DoH toggles
+- **Custom New Tab** — Clock, search, quick sites
+- **Context menus** — Save bookmarks, add to reading list, search selection
+- **Statistics** — Trackers/ads blocked counter
+- **Keyboard shortcuts** — `Ctrl+Shift+E` to open, `Ctrl+Shift+P` privacy toggle
+
+### Installation
+
+**Chrome / Edge / Brave:**
+1. Go to `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked** → select `extension/` folder
+
+**Firefox:**
+1. Go to `about:debugging`
+2. Click **This Firefox** → **Load Temporary Add-on**
+3. Select `extension/manifest.json`
+
+---
+
+## 📱 Mobile App (React Native + Expo)
+
+The `mobile/` directory contains a **React Native + Expo** mobile browser for Android and iOS.
+
+### Features
+- Full WebView browser with multi-tab support
+- Smart address bar with URL/search
+- Native navigation gestures (swipe back/forward)
+- Share integration, geolocation, biometric auth
+- Dark mode (system theme)
+- Push notifications
+- File downloads
+
+### Quick Start
+
+```bash
+cd mobile
+npm install
+npm start          # Expo development server
+npm run android    # Android emulator
+npm run ios        # iOS simulator (macOS required)
+```
+
+### Production Build (EAS)
+
+```bash
+npm install -g eas-cli
+eas login
+eas build --platform android --profile production
+eas build --platform ios --profile production
+eas submit --platform android
+eas submit --platform ios
+```
+
+---
+
+*Web App, Extension, and Mobile App added in v2.0 — EmbeddedOS Organization*

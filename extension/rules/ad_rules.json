@@ -1,0 +1,12 @@
+[
+  { "id": 101, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "pagead2.googlesyndication.com", "resourceTypes": ["script", "sub_frame", "image"] } },
+  { "id": 102, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "ads.google.com", "resourceTypes": ["script", "sub_frame", "image", "xmlhttprequest"] } },
+  { "id": 103, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "adservice.google.com", "resourceTypes": ["script", "xmlhttprequest"] } },
+  { "id": 104, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "googlesyndication.com", "resourceTypes": ["script", "sub_frame", "image"] } },
+  { "id": 105, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "amazon-adsystem.com", "resourceTypes": ["script", "sub_frame", "image"] } },
+  { "id": 106, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "ads.yahoo.com", "resourceTypes": ["script", "sub_frame", "image"] } },
+  { "id": 107, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "advertising.com", "resourceTypes": ["script", "sub_frame", "image"] } },
+  { "id": 108, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "adnxs.com", "resourceTypes": ["script", "sub_frame", "image", "xmlhttprequest"] } },
+  { "id": 109, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "rubiconproject.com", "resourceTypes": ["script", "xmlhttprequest"] } },
+  { "id": 110, "priority": 1, "action": { "type": "block" }, "condition": { "urlFilter": "pubmatic.com", "resourceTypes": ["script", "xmlhttprequest"] } }
+]

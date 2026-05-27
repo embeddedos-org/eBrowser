@@ -1,0 +1,26 @@
+{
+  "extName": {
+    "message": "eBrowser",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "The World's Most Powerful Browser — privacy, speed, and all features in one.",
+    "description": "Extension description"
+  },
+  "blockTrackers": {
+    "message": "Block Trackers",
+    "description": "Block cross-site tracking"
+  },
+  "blockAds": {
+    "message": "Block Ads",
+    "description": "Block advertisements"
+  },
+  "newTab": {
+    "message": "New Tab",
+    "description": "New tab page title"
+  },
+  "settings": {
+    "message": "Settings",
+    "description": "Settings page title"
+  }
+}
