@@ -26,7 +26,7 @@ jobs:
     name: Smoke Test — Windows x64
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine tag
         id: tag
@@ -155,7 +155,7 @@ jobs:
     name: Smoke Test — macOS arm64
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine tag
         id: tag
@@ -270,7 +270,7 @@ jobs:
     name: Smoke Test — Linux .deb
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine tag
         id: tag
@@ -380,7 +380,7 @@ jobs:
     name: Smoke Test — Linux AppImage
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine tag
         id: tag
