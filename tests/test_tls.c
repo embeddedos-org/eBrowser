@@ -11,11 +11,18 @@ static int s_pass = 0, s_fail = 0;
 
 TEST(test_config_default) {
     eb_tls_config_t cfg = eb_tls_config_default();
-TEST(test_tls_free) {
-    eb_tls_ctx_t ctx;
-    eb_tls_init(&ctx, NULL);
-    eb_tls_free(&ctx);
-    ASSERT(ctx.state == 0);
+    /* A default config must refuse anything below TLS 1.2 and must verify
+     * both the peer chain and the hostname; a default that silently skips
+     * verification is the failure mode this asserts against. */
+    ASSERT(cfg.min_version == EB_TLS_1_2);
+    ASSERT(cfg.max_version == EB_TLS_1_3);
+    ASSERT(cfg.verify_peer == true);
+    ASSERT(cfg.verify_hostname == true);
+    ASSERT(cfg.ca_cert_path == NULL);
+    ASSERT(cfg.cipher_count == 3);
+    ASSERT(cfg.preferred_ciphers[0] == EB_CIPHER_AES_128_GCM_SHA256);
+    ASSERT(cfg.preferred_ciphers[1] == EB_CIPHER_AES_256_GCM_SHA384);
+    ASSERT(cfg.preferred_ciphers[2] == EB_CIPHER_AES_128_CBC_SHA256);
 }
 
 TEST(test_tls_init) {

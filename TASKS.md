@@ -17,7 +17,8 @@ Status is one of: `todo`, `in-progress`, `blocked`, `review`, `done`.
 
 | ID | Task | Owner | Verified by | Evidence |
 |----|------|-------|-------------|----------|
-| —  | None yet. | — | — | — |
+| T-001 | Fix a 2,888-byte stack overflow in every consumer of `eBrowser_security` | security | reviewer | `EB_USE_MBEDTLS` was defined `PRIVATE` in `src/security/CMakeLists.txt`, but it adds seven members to `eb_tls_ctx_t` in the **public** header `include/eBrowser/tls.h`. Measured: the library compiled `sizeof(eb_tls_ctx_t) == 10832`, every consumer saw `7944`, so `eb_tls_init()` wrote 2,888 bytes past the end of a caller-allocated stack object. `test_tls` died with `*** stack smashing detected ***`. Changed the define and the mbedtls link to `PUBLIC`; both sides now measure 10832 and the test passes. |
+| T-002 | Repair `tests/test_tls.c`, which did not compile | testing | reviewer | `test_config_default()` was truncated mid-body and a duplicate copy of `test_tls_free()` was spliced inside it, so every following function nested illegally — 20+ `invalid storage class for function` errors plus a redefinition. This one file failed the whole parallel build, which is why `test_url`, `test_tls` and `test_modules` were reported `***Not Run`. Restored the assertions (default config must require TLS 1.2+ and verify both peer and hostname) and removed the duplicate. 20/20 tests pass. |
 
 ---
 
