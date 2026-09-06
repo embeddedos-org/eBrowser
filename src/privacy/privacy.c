@@ -102,30 +102,52 @@ bool eb_priv_should_allow_cookie(const eb_privacy_t *p, const char *dom,
     return true;
 }
 
+/* strncpy(dst, src, max-1) leaves dst unterminated whenever src is max-1 bytes
+ * or longer, and every caller of eb_priv_apply_referrer() treats ref as a C
+ * string. Terminate explicitly instead. */
+static void referrer_copy(char *dst, const char *src, size_t max) {
+    if (!max) return;
+    strncpy(dst, src, max - 1);
+    dst[max - 1] = '\0';
+}
+
 int eb_priv_apply_referrer(const eb_privacy_t *p, const char *from,
                             const char *to, char *ref, size_t max) {
-    if (!p || !from || !to || !ref) return -1;
+    if (!p || !from || !to || !ref || max == 0) return -1;
+    /* Every path below returns a referrer or none; start from none so no exit
+     * can leave the caller's buffer holding whatever was there before. */
+    ref[0] = '\0';
     switch (p->referrer_policy) {
-    case EB_REF_NONE: ref[0] = '\0'; p->referrers_stripped; return 0;
+    /* p->referrers_stripped is not incremented here: p is const, so the
+     * statement that used to sit on this line had no effect and the counter
+     * has never moved. Fixing that means changing this function's signature,
+     * which is a public-API decision rather than a bounds fix. */
+    case EB_REF_NONE: return 0;
     case EB_REF_ORIGIN_ONLY: {
         const char *s = strstr(from, "://");
-        if (!s) { ref[0]='\0'; return 0; }
+        if (!s) return 0;
         const char *e = strchr(s+3, '/');
         size_t len = e ? (size_t)(e-from) : strlen(from);
-        if (len >= max) len = max-1;
-        memcpy(ref, from, len); ref[len]='/'; ref[len+1]='\0'; return 0;
+        /* Two bytes are written after the origin — the trailing '/' and the
+         * NUL — so the bound must reserve both. Clamping to max-1 reserved
+         * only the NUL and put ref[len+1] one byte past the buffer. */
+        if (max >= 2) {
+            if (len > max - 2) len = max - 2;
+            memcpy(ref, from, len); ref[len]='/'; ref[len+1]='\0';
+        }
+        return 0;
     }
     case EB_REF_SAME_ORIGIN: {
         /* Only send referrer if same origin */
         const char *fs = strstr(from, "://"), *ts = strstr(to, "://");
-        if (!fs || !ts) { ref[0]='\0'; return 0; }
+        if (!fs || !ts) return 0;
         const char *fe = strchr(fs+3, '/'), *te = strchr(ts+3, '/');
         size_t fl = fe ? (size_t)(fe-from) : strlen(from);
         size_t tl = te ? (size_t)(te-to) : strlen(to);
-        if (fl != tl || strncmp(from, to, fl) != 0) { ref[0]='\0'; return 0; }
-        strncpy(ref, from, max-1); return 0;
+        if (fl != tl || strncmp(from, to, fl) != 0) return 0;
+        referrer_copy(ref, from, max); return 0;
     }
-    default: strncpy(ref, from, max-1); return 0;
+    default: referrer_copy(ref, from, max); return 0;
     }
 }
 
