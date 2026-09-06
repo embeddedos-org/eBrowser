@@ -129,6 +129,56 @@ TEST(test_referrer_origin_only) {
     eb_priv_destroy(&p);
 }
 
+/* Regression: the truncation branch clamped the origin to max-1 and then wrote
+ * both a '/' and a NUL after it, so the last byte landed one past the buffer.
+ * The canary is checked rather than trusted to crash — a one-byte overflow of a
+ * stack array is invisible without a sanitizer. */
+TEST(test_referrer_origin_only_truncates_within_bounds) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    p.referrer_policy = EB_REF_ORIGIN_ONLY;
+    struct { char ref[24]; char canary[8]; } buf;
+    memset(&buf, 0, sizeof(buf));
+    memset(buf.canary, '#', sizeof(buf.canary));
+    /* Origin is 24 bytes — exactly sizeof(buf.ref) — so it must be truncated. */
+    eb_priv_apply_referrer(&p, "https://averylongdom.com/path/here",
+                           "https://dest.com", buf.ref, sizeof(buf.ref));
+    for (size_t i = 0; i < sizeof(buf.canary); i++) ASSERT(buf.canary[i] == '#');
+    ASSERT(strlen(buf.ref) < sizeof(buf.ref));
+    ASSERT(buf.ref[strlen(buf.ref)-1] == '/');
+    eb_priv_destroy(&p);
+}
+
+/* Regression: strncpy(ref, from, max-1) left ref unterminated when the source
+ * filled it. Both the same-origin and the full-referrer policies used it. */
+TEST(test_referrer_always_terminates) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    const char *url = "https://averylongdomainname.example.com/deep/path";
+    char ref[16];
+
+    p.referrer_policy = EB_REF_FULL;
+    memset(ref, 'A', sizeof(ref));
+    eb_priv_apply_referrer(&p, url, url, ref, sizeof(ref));
+    ASSERT(strlen(ref) < sizeof(ref));
+
+    p.referrer_policy = EB_REF_SAME_ORIGIN;
+    memset(ref, 'A', sizeof(ref));
+    eb_priv_apply_referrer(&p, url, url, ref, sizeof(ref));
+    ASSERT(strlen(ref) < sizeof(ref));
+
+    eb_priv_destroy(&p);
+}
+
+TEST(test_referrer_rejects_zero_length_buffer) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    char ref[1] = { 'A' };
+    ASSERT(eb_priv_apply_referrer(&p, "https://a.com/", "https://b.com/", ref, 0) == -1);
+    ASSERT(ref[0] == 'A');   /* untouched */
+    eb_priv_destroy(&p);
+}
+
 TEST(test_exceptions) {
     eb_privacy_t p;
     eb_priv_init(&p);
@@ -267,6 +317,9 @@ int main(void) {
     RUN(test_cookie_policy_block_third_party); RUN(test_cookie_policy_block_all);
     RUN(test_incognito_mode); RUN(test_tor_mode);
     RUN(test_referrer_none); RUN(test_referrer_origin_only);
+    RUN(test_referrer_origin_only_truncates_within_bounds);
+    RUN(test_referrer_always_terminates);
+    RUN(test_referrer_rejects_zero_length_buffer);
     RUN(test_exceptions); RUN(test_header_injection);
     RUN(test_tb_init); RUN(test_tb_parse_domain_filter);
     RUN(test_tb_parse_exception); RUN(test_tb_parse_comment);
