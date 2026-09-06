@@ -82,6 +82,13 @@ add_executable(test_bookmark test_bookmark.c)
 target_link_libraries(test_bookmark PRIVATE eb_ui)
 add_test(NAME test_bookmark COMMAND test_bookmark)
 
+add_executable(test_perf_cache test_perf_cache.c)
+target_link_libraries(test_perf_cache PRIVATE eb_perf)
+add_test(NAME test_perf_cache COMMAND test_perf_cache)
+# Both regressions this covers were a hang, not a wrong answer, so an
+# unbounded test run would stall the suite rather than fail it.
+set_tests_properties(test_perf_cache PROPERTIES TIMEOUT 30)
+
 # --- Benchmark ---
 add_executable(benchmark benchmark.c)
 target_link_libraries(benchmark PRIVATE
