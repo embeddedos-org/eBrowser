@@ -125,6 +125,7 @@ const resources = {
         noBookmarks: 'No bookmarks yet',
         bookmarkAdded: 'Bookmark added',
         bookmarkRemoved: 'Bookmark removed',
+        bookmarkUpdated: 'Bookmark updated',
         folderName: 'Folder Name',
         bookmarkName: 'Bookmark Name',
         bookmarkUrl: 'Bookmark URL',

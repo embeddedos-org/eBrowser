@@ -11,7 +11,9 @@ export default function BookmarksPage() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editUrl, setEditUrl] = useState('');
 
   useEffect(() => {
     const loadBookmarks = async () => {
@@ -32,6 +34,29 @@ export default function BookmarksPage() {
   const handleNavigate = (url: string) => {
     const tab = store.getActiveTab();
     if (tab) store.navigateTo(url, tab.id);
+  };
+
+  const handleEdit = (bm: Bookmark) => {
+    setEditingId(bm.id ?? null);
+    setEditTitle(bm.title);
+    setEditUrl(bm.url);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditTitle('');
+    setEditUrl('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (editingId == null) return;
+    const title = editTitle.trim();
+    const url = editUrl.trim();
+    if (!title || !url) return;
+    await bookmarkDB.update(editingId, { title, url });
+    setBookmarks(bs => bs.map(bm => (bm.id === editingId ? { ...bm, title, url } : bm)));
+    store.addToast({ type: 'success', message: t('bookmarks.bookmarkUpdated') });
+    handleCancelEdit();
   };
 
   return (
@@ -91,10 +116,39 @@ export default function BookmarksPage() {
                   <Star size={14} className="text-yellow-500" />
                 )}
               </div>
-              <button onClick={() => handleNavigate(bm.url)} className="flex-1 min-w-0 text-left">
-                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{bm.title}</div>
-                <div className="text-xs text-gray-400 truncate">{bm.url}</div>
-              </button>
+              {editingId === bm.id ? (
+                <div className="flex-1 min-w-0 flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder={t('bookmarks.bookmarkName')}
+                    aria-label={t('bookmarks.bookmarkName')}
+                    className="input text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={editUrl}
+                    onChange={(e) => setEditUrl(e.target.value)}
+                    placeholder={t('bookmarks.bookmarkUrl')}
+                    aria-label={t('bookmarks.bookmarkUrl')}
+                    className="input text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={handleSaveEdit} className="btn-primary text-xs px-3 py-1">
+                      {t('common.save')}
+                    </button>
+                    <button onClick={handleCancelEdit} className="btn-secondary text-xs px-3 py-1">
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => handleNavigate(bm.url)} className="flex-1 min-w-0 text-left">
+                  <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{bm.title}</div>
+                  <div className="text-xs text-gray-400 truncate">{bm.url}</div>
+                </button>
+              )}
               {bm.tags && bm.tags.length > 0 && (
                 <div className="flex gap-1 flex-shrink-0">
                   {bm.tags.slice(0, 2).map(tag => (
@@ -106,7 +160,7 @@ export default function BookmarksPage() {
                 <button onClick={() => window.open(bm.url, '_blank')} className="icon-btn w-6 h-6" title="Open in new tab">
                   <ExternalLink size={12} />
                 </button>
-                <button onClick={() => setEditingId(bm.id ?? null)} className="icon-btn w-6 h-6" title={t('bookmarks.editBookmark')}>
+                <button onClick={() => handleEdit(bm)} className="icon-btn w-6 h-6" title={t('bookmarks.editBookmark')}>
                   <Edit2 size={12} />
                 </button>
                 <button onClick={() => bm.id && handleDelete(bm.id)} className="icon-btn w-6 h-6 text-red-400 hover:text-red-600" title={t('bookmarks.deleteBookmark')}>
