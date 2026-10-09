@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+type MockFn = { mockResolvedValue: (value: unknown) => void };
 
 vi.mock('@/utils/database', () => ({
   bookmarkDB: {
@@ -23,7 +26,9 @@ vi.mock('@/store/browserStore', () => ({
 
 vi.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: any) => <div {...props}>{children}</div>,
+    div: ({ children, ...props }: { children?: ReactNode; [key: string]: unknown }) => (
+      <div {...props}>{children}</div>
+    ),
   },
 }));
 
@@ -36,8 +41,8 @@ const bookmarks = [
 
 beforeEach(() => {
   vi.clearAllMocks();
-  (bookmarkDB.getAll as any).mockResolvedValue(bookmarks);
-  (bookmarkDB.update as any).mockResolvedValue(1);
+  (bookmarkDB.getAll as unknown as MockFn).mockResolvedValue(bookmarks);
+  (bookmarkDB.update as unknown as MockFn).mockResolvedValue(1);
 });
 
 describe('BookmarksPage inline edit (#45)', () => {
