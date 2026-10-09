@@ -138,7 +138,10 @@ export default function WebView({ tab }: Props) {
         title={tab.title || tab.url}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals allow-orientation-lock allow-pointer-lock allow-presentation allow-top-navigation-by-user-activation"
         allow="geolocation; camera; microphone; fullscreen; payment; autoplay; clipboard-read; clipboard-write"
-        referrerPolicy="strict-origin-when-cross-origin"
+        {/* Privacy invariant (docs/privacy-invariants.md, "Mode defaults"):
+            the default referrer policy is origin-only, so a navigation can
+            only under-disclose, never leak a full URL to another origin. */}
+        referrerPolicy="origin"
       />
 
       {/* Incognito overlay indicator */}
