@@ -77,7 +77,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**'],
-      thresholds: { lines: 22, functions: 40, statements: 22 }
+      thresholds: { lines: 27, functions: 40, statements: 27 }
     }
   }
 });

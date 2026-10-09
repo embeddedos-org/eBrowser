@@ -39,6 +39,17 @@ describe('address bar', () => {
     expect(activeUrl()).toBe('https://search.test/?q=privacy%20browser');
   });
 
+  it('uses the engine chosen after the address bar was rendered', () => {
+    store().updateSettings({ searchEngine: 'duckduckgo' });
+    render(<Toolbar />);
+    store().updateSettings({ searchEngine: 'brave' });
+    const input = document.getElementById('address-bar-input') as HTMLInputElement;
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'privacy browser' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(activeUrl()).toBe('https://search.brave.com/search?q=privacy%20browser');
+  });
+
   it('navigates to an address instead of searching for it', () => {
     store().updateSettings({ searchEngine: 'duckduckgo' });
     submitAddressBar('example.com');
