@@ -20,6 +20,9 @@ vi.mock('@/utils/database', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
+  // src/i18n/config.ts calls i18n.use(initReactI18next) at import time;
+  // the mock must provide the module or the suite fails to collect.
+  initReactI18next: { type: '3rdParty', init: () => {} },
 }));
 
 vi.mock('@/store/browserStore', () => ({
