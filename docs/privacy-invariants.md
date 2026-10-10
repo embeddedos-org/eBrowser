@@ -63,6 +63,43 @@ not a bounds fix. The counter stays at zero until that decision is made.
 
 ## What this doc does not cover
 
-Fingerprinting resistance (canvas, fonts, UA reduction) is not yet part of
-the engine — the struct has no fingerprinting knobs. That is the next
-privacy milestone, not a current guarantee.
+Fingerprinting resistance is implemented and documented above; the
+remaining gap is its wiring to `eb_priv_set_mode` (the mode → AFP-level
+mapping is undecided).
+
+## Anti-fingerprinting ladder
+
+`src/security/anti_fingerprint/` (`eb_anti_fingerprint_t`,
+`include/ebrowser/anti_fingerprint.h`) implements the fingerprinting
+defense an earlier revision of this doc listed as a future milestone.
+It is a separate struct, not part of `eb_privacy_t` — the wiring to
+privacy modes is the remaining integration step (see below).
+
+### Level ladder (monotonic)
+
+| Level | Canvas | WebGL | Fonts | Timing | Screen / UA / cores / mem | API blocks |
+|---|---|---|---|---|---|---|
+| `EB_AFP_OFF` | — | — | — | — | — | — |
+| `EB_AFP_STANDARD` (init default) | 2-bit noise | vendor → "WebKit" | restricted | 100µs jitter, 1ms resolution | — | WebRTC IP, battery, bluetooth, USB; audio noise 0.0001 |
+| `EB_AFP_STRICT` | 4-bit noise | vendor+renderer → "WebKit", extensions blocked | restricted | 500µs jitter, 5ms resolution | 1920×1080×24, UA + 4 cores + 8 GB spoofed | all of STANDARD; audio noise 0.001 |
+| `EB_AFP_TOR_LIKE` | readback blocked | vendor+renderer → "Mozilla", extensions blocked | restricted | 1ms jitter, 100ms resolution | 1000×1000×24, fixed UA pool, 2 cores / 8 GB | all of STRICT |
+
+Each level is a superset of the previous: raising the level never
+*removes* a protection.
+
+### Fail-closed construction
+
+1. `eb_afp_init` memsets the struct to zero **before** applying the
+   level — a fresh struct can never sit partially configured, and every
+   spoofed value is a fixed constant, never the real device value.
+2. Every entry point is NULL-safe: a missing struct disables defenses,
+   never crashes or half-applies them.
+3. `eb_afp_calculate_score` lets CI assert the ladder — protections on
+   ⇒ low entropy score; protections off ⇒ high.
+
+### Remaining integration
+
+`eb_priv_set_mode` does not yet drive `eb_afp_set_level`. The natural
+mapping — Normal → STANDARD (already the init default), Incognito →
+STRICT, Tor → TOR_LIKE — is a maintainer decision, not taken yet.
+Until it lands, embedders must call `eb_afp_set_level` explicitly.
