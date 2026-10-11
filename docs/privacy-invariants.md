@@ -40,11 +40,11 @@ not a bounds fix. The counter stays at zero until that decision is made.
 
 ## Mode defaults
 
-| Mode | Cookie policy | Referrer policy |
-|---|---|---|
-| Normal (default) | Block third-party | Origin-only |
-| Incognito | Delete on close | Origin-only |
-| Tor | Block all | None |
+| Mode | Cookie policy | Referrer policy | AFP level |
+|---|---|---|---|
+| Normal (default) | Block third-party | Origin-only | `EB_AFP_STANDARD` |
+| Incognito | Delete on close | Origin-only | `EB_AFP_STRICT` |
+| Tor | Block all | None | `EB_AFP_TOR_LIKE` |
 
 ## Engine-wide guarantees
 
@@ -61,19 +61,43 @@ not a bounds fix. The counter stays at zero until that decision is made.
 - **Per-site exceptions** (`eb_priv_add_exception`) are explicit and bounded
   (max 128); there is no silent allowlist.
 
+## Mode → AFP-level mapping (decided 2026-10-11)
+
+The wiring gap noted in the "Anti-fingerprinting ladder" section is now
+closed. `eb_anti_fingerprint_t` is embedded in `eb_privacy_t`
+(`include/ebrowser/privacy.h`), owned end-to-end by the privacy engine:
+`eb_priv_init()` runs `eb_afp_init()`, `eb_priv_destroy()` runs
+`eb_afp_destroy()`, and `eb_priv_set_mode()` drives `eb_afp_set_level()`
+with the decided mapping:
+
+| Privacy mode | AFP level |
+|---|---|
+| `EB_PRIV_NORMAL` | `EB_AFP_STANDARD` (matches the `eb_afp_init` default) |
+| `EB_PRIV_INCOGNITO` | `EB_AFP_STRICT` |
+| `EB_PRIV_TOR_MODE` | `EB_AFP_TOR_LIKE` |
+
+Rationale: raising the privacy mode must never *reduce* fingerprinting
+resistance (the monotonicity invariant in `tests/test_privacy_invariants.c`),
+so the ladder order STANDARD → STRICT → TOR_LIKE is the only ordering
+consistent with the mode order Normal → Incognito → Tor. The init default
+stays `EB_AFP_STANDARD`, so a freshly-initialized engine is already at the
+Normal-mode level with no special-casing. Embedders that need finer control
+can still call `eb_afp_set_level()` directly on `priv.afp` — it is a public
+field, not a hidden member.
+
 ## What this doc does not cover
 
-Fingerprinting resistance is implemented and documented above; the
-remaining gap is its wiring to `eb_priv_set_mode` (the mode → AFP-level
-mapping is undecided).
+Cross-engine interactions outside the privacy engine: how the render engine
+applies `priv.afp` to canvas/WebGL callsites, the per-site AFP override UI,
+and telemetry policy for the `eb_afp_score_t` risk field.
 
 ## Anti-fingerprinting ladder
 
 `src/security/anti_fingerprint/` (`eb_anti_fingerprint_t`,
 `include/ebrowser/anti_fingerprint.h`) implements the fingerprinting
 defense an earlier revision of this doc listed as a future milestone.
-It is a separate struct, not part of `eb_privacy_t` — the wiring to
-privacy modes is the remaining integration step (see below).
+The AFP struct is embedded in `eb_privacy_t` and wired to privacy modes
+as documented above ("Mode → AFP-level mapping").
 
 ### Level ladder (monotonic)
 
@@ -97,9 +121,8 @@ Each level is a superset of the previous: raising the level never
 3. `eb_afp_calculate_score` lets CI assert the ladder — protections on
    ⇒ low entropy score; protections off ⇒ high.
 
-### Remaining integration
+### Integration (landed 2026-10-11)
 
-`eb_priv_set_mode` does not yet drive `eb_afp_set_level`. The natural
-mapping — Normal → STANDARD (already the init default), Incognito →
-STRICT, Tor → TOR_LIKE — is a maintainer decision, not taken yet.
-Until it lands, embedders must call `eb_afp_set_level` explicitly.
+`eb_priv_set_mode` drives `eb_afp_set_level` via the mode → AFP-level mapping
+recorded above. Previously, embedders had to call `eb_afp_set_level`
+explicitly — now the privacy engine owns the ladder end-to-end.

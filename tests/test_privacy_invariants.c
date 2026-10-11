@@ -8,6 +8,7 @@
 //  - third-party cookies are denied in incognito/Tor regardless of policy
 //  - referrer policies never leak more than the policy allows
 //  - the tracker blocker denies what its filters match and counts it
+//  - each privacy mode sets its AFP ladder level; raising mode never lowers it
 #include "eBrowser/privacy.h"
 #include "eBrowser/tracker_blocker.h"
 #include <stdio.h>
@@ -171,6 +172,52 @@ TEST(test_tracker_blocker_blocks_and_counts) {
     eb_tb_destroy(&s_tb);
 }
 
+/* Privacy mode -> anti-fingerprinting ladder wiring
+ * (docs/privacy-invariants.md, decided 2026-10-11):
+ *   EB_PRIV_NORMAL -> EB_AFP_STANDARD
+ *   EB_PRIV_INCOGNITO -> EB_AFP_STRICT
+ *   EB_PRIV_TOR_MODE -> EB_AFP_TOR_LIKE */
+TEST(test_init_afp_level_matches_normal_mode) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    /* The eb_afp_init default is STANDARD, matching the Normal mapping. */
+    ASSERT(p.afp.level == EB_AFP_STANDARD);
+    eb_priv_destroy(&p);
+}
+
+TEST(test_mode_drives_afp_level) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    eb_priv_set_mode(&p, EB_PRIV_NORMAL);
+    ASSERT(p.afp.level == EB_AFP_STANDARD);
+    eb_priv_set_mode(&p, EB_PRIV_INCOGNITO);
+    ASSERT(p.afp.level == EB_AFP_STRICT);
+    eb_priv_set_mode(&p, EB_PRIV_TOR_MODE);
+    ASSERT(p.afp.level == EB_AFP_TOR_LIKE);
+    /* Re-entering a mode re-applies its level (no one-way latch). */
+    eb_priv_set_mode(&p, EB_PRIV_NORMAL);
+    ASSERT(p.afp.level == EB_AFP_STANDARD);
+    eb_priv_destroy(&p);
+}
+
+/* Invariant: raising the privacy mode never lowers AFP protection. The
+ * AFP enum is ordered OFF < STANDARD < STRICT < TOR_LIKE, so the mode
+ * ladder Normal -> Incognito -> Tor must be non-decreasing in level. */
+TEST(test_mode_raises_never_lower_afp) {
+    static const eb_priv_mode_t s_ladder[] = {
+        EB_PRIV_NORMAL, EB_PRIV_INCOGNITO, EB_PRIV_TOR_MODE
+    };
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    eb_afp_level_t prev = EB_AFP_OFF;
+    for (size_t i = 0; i < sizeof(s_ladder)/sizeof(s_ladder[0]); i++) {
+        eb_priv_set_mode(&p, s_ladder[i]);
+        ASSERT(p.afp.level >= prev);
+           prev = p.afp.level;
+    }
+    eb_priv_destroy(&p);
+}
+
 TEST(test_null_safety) {
     eb_priv_init(NULL);
     eb_priv_destroy(NULL);
@@ -195,6 +242,9 @@ int main(void) {
     RUN(test_referrer_same_origin);
     RUN(test_dnt_gpc_headers);
     RUN(test_tracker_blocker_blocks_and_counts);
+    RUN(test_init_afp_level_matches_normal_mode);
+    RUN(test_mode_drives_afp_level);
+    RUN(test_mode_raises_never_lower_afp);
     RUN(test_null_safety);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;

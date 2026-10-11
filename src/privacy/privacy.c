@@ -24,9 +24,23 @@ void eb_priv_init(eb_privacy_t *p) {
     p->https_only = true;
     for (int i = 0; s_default_tracking[i]; i++)
         eb_priv_add_tracking_param(p, s_default_tracking[i]);
+    /* Init default EB_AFP_STANDARD == the EB_PRIV_NORMAL mapping, so a
+     * freshly-initialized engine is already at the right AFP level. */
+    eb_afp_init(&p->afp);
 }
 
-void eb_priv_destroy(eb_privacy_t *p) { if (p) memset(p, 0, sizeof(*p)); }
+void eb_priv_destroy(eb_privacy_t *p) { if (p) { eb_afp_destroy(&p->afp); memset(p, 0, sizeof(*p)); } }
+
+/* Decided mode → AFP-level mapping (docs/privacy-invariants.md). Unknown
+ * modes fall back to STANDARD — the init default, never the weakest. */
+static eb_afp_level_t eb_priv_afp_for_mode(eb_priv_mode_t m) {
+    switch (m) {
+    case EB_PRIV_INCOGNITO: return EB_AFP_STRICT;
+    case EB_PRIV_TOR_MODE:  return EB_AFP_TOR_LIKE;
+    case EB_PRIV_NORMAL:
+    default:                return EB_AFP_STANDARD;
+    }
+}
 
 void eb_priv_set_mode(eb_privacy_t *p, eb_priv_mode_t m) {
     if (!p) return; p->mode = m;
@@ -42,6 +56,7 @@ void eb_priv_set_mode(eb_privacy_t *p, eb_priv_mode_t m) {
         p->clear_on_exit = true; break;
     default: break;
     }
+    eb_afp_set_level(&p->afp, eb_priv_afp_for_mode(m));
 }
 
 bool eb_priv_is_tracking_param(const eb_privacy_t *p, const char *param) {

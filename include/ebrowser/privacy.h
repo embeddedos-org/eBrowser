@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "eBrowser/anti_fingerprint.h"
 
 #define EB_PRIV_MAX_TRACKING_PARAMS 64
 #define EB_PRIV_MAX_PARAM_LEN       64
@@ -21,6 +22,11 @@ typedef struct {
     char tracking_params[EB_PRIV_MAX_TRACKING_PARAMS][EB_PRIV_MAX_PARAM_LEN]; int tracking_param_count;
     char exceptions[EB_PRIV_MAX_EXCEPTIONS][256]; int exception_count;
     uint64_t cookies_blocked, trackers_stripped, referrers_stripped;
+    /* Anti-fingerprinting ladder, owned by the privacy engine and driven by
+     * eb_priv_set_mode(): EB_PRIV_NORMAL->EB_AFP_STANDARD,
+     * EB_PRIV_INCOGNITO->EB_AFP_STRICT, EB_PRIV_TOR_MODE->EB_AFP_TOR_LIKE
+     * (decided mapping, docs/privacy-invariants.md). */
+    eb_anti_fingerprint_t afp;
 } eb_privacy_t;
 
 void eb_priv_init(eb_privacy_t *priv);
