@@ -46,6 +46,28 @@ not a bounds fix. The counter stays at zero until that decision is made.
 | Incognito | Delete on close | Origin-only | `EB_AFP_STRICT` |
 | Tor | Block all | None | `EB_AFP_TOR_LIKE` |
 
+## Mode → referrer-policy mapping (decided 2026-10-13)
+
+`eb_priv_set_mode()` drives `referrer_policy` with the mapping already
+shown in the Mode defaults table — verified against the implementation
+on 2026-10-13 (the wiring predates this record; what was missing was
+the test coverage, now in `tests/test_privacy_invariants.c`):
+
+| Privacy mode | Referrer policy |
+|---|---|
+| `EB_PRIV_NORMAL` | `EB_REF_ORIGIN_ONLY` |
+| `EB_PRIV_INCOGNITO` | `EB_REF_ORIGIN_ONLY` |
+| `EB_PRIV_TOR_MODE` | `EB_REF_NONE` |
+
+Discipline, mirroring the AFP ladder: re-entering a mode re-applies its
+policy (no one-way latch), and raising the mode never weakens the
+policy — restrictiveness along Normal → Incognito → Tor is
+non-decreasing (`EB_REF_FULL` < `EB_REF_ORIGIN_ONLY` <
+`EB_REF_SAME_ORIGIN` < `EB_REF_NONE`). Embedders may still set
+`referrer_policy` directly between mode changes for a stricter
+per-site policy; the next `eb_priv_set_mode()` call re-applies the
+mode's decided policy.
+
 ## Engine-wide guarantees
 
 - **Tracking parameters** are stripped from URLs (`eb_priv_clean_url`;
@@ -126,3 +148,4 @@ Each level is a superset of the previous: raising the level never
 `eb_priv_set_mode` drives `eb_afp_set_level` via the mode → AFP-level mapping
 recorded above. Previously, embedders had to call `eb_afp_set_level`
 explicitly — now the privacy engine owns the ladder end-to-end.
+

@@ -54,7 +54,12 @@ void eb_priv_set_mode(eb_privacy_t *p, eb_priv_mode_t m) {
         p->referrer_policy = EB_REF_NONE;
         p->fpi_enabled = true; p->storage_partition = true;
         p->clear_on_exit = true; break;
-    default: break;
+    case EB_PRIV_NORMAL:
+    default:
+        /* Explicit, not inherited from init: re-entering Normal after a
+         * stricter mode restores the decided Normal referrer policy,
+         * exactly as the AFP ladder re-applies its level per mode. */
+        p->referrer_policy = EB_REF_ORIGIN_ONLY; break;
     }
     eb_afp_set_level(&p->afp, eb_priv_afp_for_mode(m));
 }
@@ -190,3 +195,4 @@ bool eb_priv_is_exception(const eb_privacy_t *p, const char *dom) {
         if (strcasecmp(p->exceptions[i], dom) == 0) return true;
     return false;
 }
+

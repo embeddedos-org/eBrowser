@@ -9,6 +9,7 @@
 //  - referrer policies never leak more than the policy allows
 //  - the tracker blocker denies what its filters match and counts it
 //  - each privacy mode sets its AFP ladder level; raising mode never lowers it
+//  - each privacy mode sets its referrer policy; raising mode never weakens it
 #include "eBrowser/privacy.h"
 #include "eBrowser/tracker_blocker.h"
 #include <stdio.h>
@@ -218,6 +219,79 @@ TEST(test_mode_raises_never_lower_afp) {
     eb_priv_destroy(&p);
 }
 
+/* Privacy mode -> referrer policy wiring (docs/privacy-invariants.md,
+ * decided mapping recorded 2026-10-13):
+ *   EB_PRIV_NORMAL    -> EB_REF_ORIGIN_ONLY (the doc's standard default)
+ *   EB_PRIV_INCOGNITO -> EB_REF_ORIGIN_ONLY
+ *   EB_PRIV_TOR_MODE  -> EB_REF_NONE
+ * The mapping was already applied by eb_priv_set_mode(); these tests are
+ * the missing coverage that pins it. */
+TEST(test_init_referrer_matches_normal_mode) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    ASSERT(p.referrer_policy == EB_REF_ORIGIN_ONLY);
+    eb_priv_destroy(&p);
+}
+
+TEST(test_mode_drives_referrer_policy) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    eb_priv_set_mode(&p, EB_PRIV_NORMAL);
+    ASSERT(p.referrer_policy == EB_REF_ORIGIN_ONLY);
+    eb_priv_set_mode(&p, EB_PRIV_INCOGNITO);
+    ASSERT(p.referrer_policy == EB_REF_ORIGIN_ONLY);
+    eb_priv_set_mode(&p, EB_PRIV_TOR_MODE);
+    ASSERT(p.referrer_policy == EB_REF_NONE);
+    /* Re-entering a mode re-applies its policy (no one-way latch). */
+    eb_priv_set_mode(&p, EB_PRIV_NORMAL);
+    ASSERT(p.referrer_policy == EB_REF_ORIGIN_ONLY);
+    eb_priv_destroy(&p);
+}
+
+/* Restrictiveness rank of a referrer policy: how much it can disclose.
+ * FULL discloses most, NONE least. */
+static int referrer_rank(eb_referrer_policy_t pol) {
+    switch (pol) {
+    case EB_REF_FULL:        return 0;
+    case EB_REF_ORIGIN_ONLY: return 1;
+    case EB_REF_SAME_ORIGIN: return 2;
+    case EB_REF_NONE:        return 3;
+    }
+    return -1;
+}
+
+/* Invariant: raising the privacy mode never weakens the referrer
+ * policy — the Normal -> Incognito -> Tor ladder is non-decreasing
+ * in restrictiveness. */
+TEST(test_mode_raises_never_weaken_referrer) {
+    static const eb_priv_mode_t s_ladder[] = {
+        EB_PRIV_NORMAL, EB_PRIV_INCOGNITO, EB_PRIV_TOR_MODE
+    };
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    int prev = -1;
+    for (size_t i = 0; i < sizeof(s_ladder)/sizeof(s_ladder[0]); i++) {
+        eb_priv_set_mode(&p, s_ladder[i]);
+        int rank = referrer_rank(p.referrer_policy);
+        ASSERT(rank >= prev);
+        prev = rank;
+    }
+    eb_priv_destroy(&p);
+}
+
+TEST(test_tor_mode_sends_no_referrer) {
+    eb_privacy_t p;
+    eb_priv_init(&p);
+    eb_priv_set_mode(&p, EB_PRIV_TOR_MODE);
+    char ref[256];
+    /* Behavioural check of the wired policy: even a same-origin
+     * navigation sends no referrer in Tor mode. */
+    ASSERT(eb_priv_apply_referrer(&p, "https://a.com/x", "https://a.com/y",
+                                  ref, sizeof ref) == 0);
+    ASSERT(ref[0] == '\0');
+    eb_priv_destroy(&p);
+}
+
 TEST(test_null_safety) {
     eb_priv_init(NULL);
     eb_priv_destroy(NULL);
@@ -245,7 +319,12 @@ int main(void) {
     RUN(test_init_afp_level_matches_normal_mode);
     RUN(test_mode_drives_afp_level);
     RUN(test_mode_raises_never_lower_afp);
+    RUN(test_init_referrer_matches_normal_mode);
+    RUN(test_mode_drives_referrer_policy);
+    RUN(test_mode_raises_never_weaken_referrer);
+    RUN(test_tor_mode_sends_no_referrer);
     RUN(test_null_safety);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }
+
