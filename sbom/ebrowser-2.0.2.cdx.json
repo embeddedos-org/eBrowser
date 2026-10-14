@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.5",
-  "serialNumber": "urn:uuid:eb-2.0.0-20260427",
+  "serialNumber": "urn:uuid:eb-2.0.2-20261014",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-04-27T00:00:00Z",
+    "timestamp": "2026-10-14T00:00:00Z",
     "tools": [
       {
         "name": "ebrowser-sbom-gen",
@@ -14,7 +14,7 @@
     "component": {
       "type": "application",
       "name": "eBrowser",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "The Most Secure Lightweight Browser",
       "licenses": [
         {
@@ -23,7 +23,7 @@
           }
         }
       ],
-      "purl": "pkg:github/embeddedos-org/eBrowser@2.0.0",
+      "purl": "pkg:github/embeddedos-org/eBrowser@2.0.2",
       "externalReferences": [
         {
           "type": "website",
@@ -48,7 +48,7 @@
     {
       "type": "library",
       "name": "eBrowser Core Engine",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "HTML5/CSS3 parser, DOM, layout engine",
       "licenses": [
         {
@@ -75,7 +75,7 @@
     {
       "type": "library",
       "name": "eBrowser Security",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "CSP, XSS prevention, CORS, TLS 1.3, SHA-256, AES-128",
       "licenses": [
         {
@@ -102,7 +102,7 @@
     {
       "type": "library",
       "name": "eBrowser Sandbox",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Process sandboxing via seccomp-BPF, namespaces, W^X",
       "licenses": [
         {
@@ -121,7 +121,7 @@
     {
       "type": "library",
       "name": "eBrowser Memory Safety",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Hardened allocator with canaries, quarantine, UAF detection",
       "licenses": [
         {
@@ -140,7 +140,7 @@
     {
       "type": "library",
       "name": "eBrowser Firewall",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Application-level firewall with domain blocklist, CIDR, rate limiting",
       "licenses": [
         {
@@ -159,7 +159,7 @@
     {
       "type": "library",
       "name": "eBrowser Anti-Fingerprint",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Browser fingerprinting protection (canvas, WebGL, fonts, timing)",
       "licenses": [
         {
@@ -178,7 +178,7 @@
     {
       "type": "library",
       "name": "eBrowser DNS Security",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "DNS-over-HTTPS, DNSSEC, DNS rebinding protection",
       "licenses": [
         {
@@ -197,7 +197,7 @@
     {
       "type": "library",
       "name": "eBrowser Privacy Engine",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Tracker blocker, URL cleaning, cookie policies, referrer stripping",
       "licenses": [
         {
@@ -216,7 +216,7 @@
     {
       "type": "library",
       "name": "eBrowser Extensions",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "WebExtensions Manifest V3 API",
       "licenses": [
         {
@@ -235,7 +235,7 @@
     {
       "type": "library",
       "name": "eBrowser Performance",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Thread pool, LRU cache, HTTP/2, prefetcher, compression",
       "licenses": [
         {
@@ -254,7 +254,7 @@
     {
       "type": "library",
       "name": "eBrowser UI",
-      "version": "2.0.0",
+      "version": "2.0.2",
       "description": "Tab manager, bookmarks, downloads, devtools, reader mode, theme",
       "licenses": [
         {

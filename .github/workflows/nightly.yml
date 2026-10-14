@@ -21,6 +21,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: SBOM drift check
+        run: python3 sbom/check_sbom.py
+
       - name: Install dependencies
         run: |
           sudo apt-get update
