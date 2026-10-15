@@ -1,0 +1,27 @@
+# eBrowser
+
+> llms.txt for the eBrowser repository (embeddedos-org/eBrowser).
+> Status: privacy-first browser with a custom rendering engine,
+> version 2.0.2 (per the `project()` declaration in CMakeLists.txt).
+> The committed CycloneDX SBOM is `sbom/ebrowser-2.0.2.cdx.json`,
+> drift-checked in Nightly against that version.
+
+eBrowser is EmbeddedOS's privacy-first browser: a custom
+rendering engine with a privacy engine whose invariants are
+documented as developer contracts, a C11 codebase, and a
+security posture maintained under the CRA regime — a committed
+SBOM whose version is checked against the build's declared
+version every night, so the artifact inventory cannot silently
+drift from the code.
+
+## Docs
+
+- [Architecture](docs/architecture.md) — engine structure and components
+- [Platform guide](docs/platform-guide.md) — supported platforms and bring-up
+- [Privacy invariants](docs/privacy-invariants.md) — the privacy engine's developer contracts (`src/privacy/`)
+- [Security advisory v2.0.0](docs/security-advisory-v2.0.0.md) — the v2.0.0 advisory record
+
+## Machine-readable
+
+- [llms-full.txt](llms-full.txt) — this corpus concatenated as one document
+- `sbom/ebrowser-2.0.2.cdx.json` — the committed CycloneDX SBOM (in the repo, under `sbom/`)

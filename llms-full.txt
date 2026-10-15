@@ -1,0 +1,451 @@
+# eBrowser — full documentation (llms-full.txt)
+
+This file is a checked-in concatenation of eBrowser's
+documentation, in the order listed below, so agents and tools
+can read the whole corpus as one document. When a source doc
+changes, update this file in the same commit. Excluded:
+docs/book/book.md (a compiled aggregate of these sources) and
+docs/wiki/ (wiki mirrors).
+
+Sources, in order:
+
+- `docs/architecture.md`
+- `docs/platform-guide.md`
+- `docs/privacy-invariants.md`
+- `docs/security-advisory-v2.0.0.md`
+
+# === docs/architecture.md ===
+
+# eBrowser Architecture
+
+## Overview
+
+eBrowser is a lightweight web browser engine for embedded and IoT devices. It follows a layered architecture that separates concerns and allows individual components to be replaced or configured for different hardware targets.
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────┐
+│               Browser UI                     │
+│   (address bar, tabs, navigation, status)    │
+├─────────────────────────────────────────────┤
+│    Core Engine (HTML / CSS / Layout / JS)    │
+├──────────────┬──────────────┬───────────────┤
+│  Rendering   │   Network    │    Input      │
+│  Backend     │   Stack      │    Layer      │
+├──────────────┴──────────────┴───────────────┤
+│       Platform Abstraction Layer (PAL)      │
+├─────────────────────────────────────────────┤
+│          OS / Hardware / Drivers             │
+└─────────────────────────────────────────────┘
+```
+
+## Modules
+
+### Core Engine (`src/engine/`)
+
+| Component | File | Description |
+|-----------|------|-------------|
+| DOM | `dom.c` | Document Object Model tree — element, text, comment nodes with attributes |
+| HTML Parser | `html_parser.c` | Tokenizer + tree-building parser supporting HTML5 void elements, attributes, comments |
+| CSS Parser | `css_parser.c` | Stylesheet parser with selector matching, 15+ CSS properties, named colors |
+| Layout Engine | `layout.c` | Block/inline layout algorithm computing box positions from styled DOM |
+
+### Rendering Backend (`src/render/`)
+
+Paints layout boxes to an LVGL canvas. Supports:
+- Background color fills
+- Text rendering
+- Border painting
+- Recursive box tree traversal
+
+### Network Stack (`src/network/`)
+
+| Component | File | Description |
+|-----------|------|-------------|
+| URL Parser | `url.c` | Parses scheme, host, port, path, query, fragment; supports relative URL resolution |
+| HTTP Client | `http.c` | HTTP/1.1 GET/POST with POSIX sockets, Winsock, and stub backends |
+
+### Input Layer (`src/input/`)
+
+Callback-based input system supporting pointer, keyboard, and touch events.
+
+### Platform Abstraction Layer (`platform/`)
+
+Provides OS-portable APIs for:
+- Monotonic clock (`eb_platform_tick_ms`)
+- Sleep (`eb_platform_sleep_ms`)
+- Memory allocation
+- File I/O
+- Platform detection
+
+### Browser UI (`src/browser/`)
+
+Full browser chrome with:
+- Navigation buttons (back, forward, reload, home)
+- URL address bar with submit-on-enter
+- Tab bar supporting up to 8 tabs
+- Page rendering area
+- Status bar
+- History navigation (back/forward)
+- Built-in home page (`about:home`)
+
+### Port Layer (`port/`)
+
+Platform-specific entry points:
+- **SDL2** (`port/sdl2/`) — Desktop simulator with SDL2 event loop
+- **EoS** (`port/eos/`) — Embedded OS integration (init/tick/deinit)
+- **Web** (`port/web/`) — Emscripten/WASM with `emscripten_set_main_loop`
+
+## Build System
+
+CMake-based with feature flags:
+- `eBrowser_BUILD_ENGINE` — Core HTML/CSS/Layout
+- `eBrowser_BUILD_RENDER` — LVGL rendering
+- `eBrowser_BUILD_NETWORK` — HTTP client
+- `eBrowser_BUILD_INPUT` — Input abstraction
+- `eBrowser_BUILD_BROWSER` — Browser UI
+- `eBrowser_BUILD_JS` — Optional JS engine (future)
+- `eBrowser_BUILD_STANDALONE` — Standalone executable
+
+## Data Flow
+
+```
+URL → HTTP GET → HTML bytes → Tokenizer → Parser → DOM tree
+                                                      ↓
+                                CSS Parser → Stylesheet
+                                                      ↓
+                                Style Resolution → Styled DOM
+                                                      ↓
+                                Layout Engine → Box tree (x,y,w,h)
+                                                      ↓
+                                Renderer → LVGL Canvas → Display
+```
+
+# === docs/platform-guide.md ===
+
+# Platform Guide
+
+## Supported Platforms
+
+| Platform | Toolchain | Entry Point | Notes |
+|----------|-----------|-------------|-------|
+| Desktop (Linux/macOS/Windows) | GCC / Clang / MSVC | `port/sdl2/main_sdl2.c` | SDL2 required |
+| EoS Embedded | arm-none-eabi-gcc | `port/eos/main_eos.c` | Uses EoS HAL |
+| Web (WASM) | Emscripten | `port/web/main_web.c` | Runs in browser |
+
+## Building for Desktop (SDL2)
+
+```bash
+mkdir build && cd build
+cmake ..
+make
+./eBrowser https://example.com
+```
+
+## Cross-Compiling for EoS
+
+```bash
+cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/eos.cmake \
+      -DEOS_TARGET_ARCH=arm ..
+make
+```
+
+The EoS port provides three functions for integration:
+- `eBrowser_eos_main()` — Initialize LVGL + browser
+- `eBrowser_eos_tick()` — Call from your main loop
+- `eBrowser_eos_deinit()` — Clean up
+
+## Building for Web (Emscripten)
+
+```bash
+emcmake cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/emscripten.cmake ..
+emmake make
+```
+
+Output: `eBrowser_web.html`, `eBrowser_web.js`, `eBrowser_web.wasm`
+
+## Platform Abstraction
+
+All platform-specific code is isolated in `platform/platform.c` using preprocessor guards:
+
+| API | Linux | Windows | EoS | Web |
+|-----|-------|---------|-----|-----|
+| `eb_platform_tick_ms()` | `clock_gettime` | `GetTickCount` | Stub | Stub |
+| `eb_platform_sleep_ms()` | `usleep` | `Sleep` | Stub | Stub |
+| `eb_platform_file_exists()` | `stat` | `GetFileAttributes` | Stub | Stub |
+| Network | POSIX sockets | Winsock | Stub | Stub |
+
+## Feature Flags
+
+Disable features to reduce binary size:
+
+```bash
+cmake -DeBrowser_BUILD_JS=OFF \
+      -DeBrowser_BUILD_NETWORK=OFF ..
+```
+
+## Memory Considerations
+
+eBrowser is designed for constrained environments:
+- DOM nodes: 64 children max, 16 attributes max
+- Layout boxes: 512 max
+- Tabs: 8 max
+- History: 64 entries max
+- All string buffers have fixed maximum sizes
+
+# === docs/privacy-invariants.md ===
+
+# eBrowser privacy invariants
+
+Developer documentation for the privacy engine (`src/privacy/`, `include/ebrowser/privacy.h`).
+These are the guarantees the engine holds — behavior that must not regress.
+
+## Referrer-policy matrix
+
+`eb_priv_apply_referrer()` decides the `Referer` header for a navigation
+from `from` to `to`, under the configured `eb_referrer_policy_t`.
+
+| Policy | Same-origin navigation | Cross-origin navigation |
+|---|---|---|
+| `EB_REF_FULL` | Full `from` URL | Full `from` URL |
+| `EB_REF_ORIGIN_ONLY` (default) | `scheme://host/` | `scheme://host/` |
+| `EB_REF_SAME_ORIGIN` | Full `from` URL | Empty |
+| `EB_REF_NONE` | Empty | Empty |
+
+### Fail-closed construction (the #28 hardening)
+
+The function is built so a bug can only *under*-disclose, never over-disclose:
+
+1. `ref` is zeroed **first**, before the policy switch. Every code path that
+   cannot produce a complete result returns with the empty referrer intact.
+2. **Never truncates.** If the origin (or full URL) does not fit in `max`,
+   the function keeps the empty referrer instead of emitting a partial URL —
+   a truncated URL can disclose a malformed partial path, which is worse
+   than nothing.
+3. Origin extraction requires a `://` separator. Malformed `from` URLs yield
+   empty, not a guess.
+4. `EB_REF_SAME_ORIGIN` compares scheme + host byte-for-byte (`fl != tl ||
+   strncmp(...) != 0` → empty). Subdomains do not match.
+5. NULL `priv`/`from`/`to`/`ref` or `max == 0` → return `-1`, `ref` untouched.
+
+### Known quirk (documented, not fixed)
+
+`p->referrers_stripped` is never incremented: the counter update used to sit
+inside this function, but `p` is `const`, so the statement had no effect.
+Fixing it means changing the function's signature — a public-API decision,
+not a bounds fix. The counter stays at zero until that decision is made.
+
+## Mode defaults
+
+| Mode | Cookie policy | Referrer policy | AFP level |
+|---|---|---|---|
+| Normal (default) | Block third-party | Origin-only | `EB_AFP_STANDARD` |
+| Incognito | Delete on close | Origin-only | `EB_AFP_STRICT` |
+| Tor | Block all | None | `EB_AFP_TOR_LIKE` |
+
+## Mode → referrer-policy mapping (decided 2026-10-13)
+
+`eb_priv_set_mode()` drives `referrer_policy` with the mapping already
+shown in the Mode defaults table — verified against the implementation
+on 2026-10-13 (the wiring predates this record; what was missing was
+the test coverage, now in `tests/test_privacy_invariants.c`):
+
+| Privacy mode | Referrer policy |
+|---|---|
+| `EB_PRIV_NORMAL` | `EB_REF_ORIGIN_ONLY` |
+| `EB_PRIV_INCOGNITO` | `EB_REF_ORIGIN_ONLY` |
+| `EB_PRIV_TOR_MODE` | `EB_REF_NONE` |
+
+Discipline, mirroring the AFP ladder: re-entering a mode re-applies its
+policy (no one-way latch), and raising the mode never weakens the
+policy — restrictiveness along Normal → Incognito → Tor is
+non-decreasing (`EB_REF_FULL` < `EB_REF_ORIGIN_ONLY` <
+`EB_REF_SAME_ORIGIN` < `EB_REF_NONE`). Embedders may still set
+`referrer_policy` directly between mode changes for a stricter
+per-site policy; the next `eb_priv_set_mode()` call re-applies the
+mode's decided policy.
+
+## Engine-wide guarantees
+
+- **Tracking parameters** are stripped from URLs (`eb_priv_clean_url`;
+  up to 64 params, maintainer-curated list, user-extensible via
+  `eb_priv_add_tracking_param`).
+- **Bounce tracking** is blocked — redirect chains through known tracker
+  domains are not followed for attribution.
+- **Third-party cookies** are blocked by default; Tor mode blocks all.
+- **DNT (`DNT: 1`) and GPC** headers are injected when enabled.
+- **First-party isolation** (`fpi_enabled`) and **storage partitioning**
+  keep cross-site state separated.
+- **HTTPS-only** mode refuses plaintext navigation.
+- **Per-site exceptions** (`eb_priv_add_exception`) are explicit and bounded
+  (max 128); there is no silent allowlist.
+
+## Mode → AFP-level mapping (decided 2026-10-11)
+
+The wiring gap noted in the "Anti-fingerprinting ladder" section is now
+closed. `eb_anti_fingerprint_t` is embedded in `eb_privacy_t`
+(`include/ebrowser/privacy.h`), owned end-to-end by the privacy engine:
+`eb_priv_init()` runs `eb_afp_init()`, `eb_priv_destroy()` runs
+`eb_afp_destroy()`, and `eb_priv_set_mode()` drives `eb_afp_set_level()`
+with the decided mapping:
+
+| Privacy mode | AFP level |
+|---|---|
+| `EB_PRIV_NORMAL` | `EB_AFP_STANDARD` (matches the `eb_afp_init` default) |
+| `EB_PRIV_INCOGNITO` | `EB_AFP_STRICT` |
+| `EB_PRIV_TOR_MODE` | `EB_AFP_TOR_LIKE` |
+
+Rationale: raising the privacy mode must never *reduce* fingerprinting
+resistance (the monotonicity invariant in `tests/test_privacy_invariants.c`),
+so the ladder order STANDARD → STRICT → TOR_LIKE is the only ordering
+consistent with the mode order Normal → Incognito → Tor. The init default
+stays `EB_AFP_STANDARD`, so a freshly-initialized engine is already at the
+Normal-mode level with no special-casing. Embedders that need finer control
+can still call `eb_afp_set_level()` directly on `priv.afp` — it is a public
+field, not a hidden member.
+
+## What this doc does not cover
+
+Cross-engine interactions outside the privacy engine: how the render engine
+applies `priv.afp` to canvas/WebGL callsites, the per-site AFP override UI,
+and telemetry policy for the `eb_afp_score_t` risk field.
+
+## Anti-fingerprinting ladder
+
+`src/security/anti_fingerprint/` (`eb_anti_fingerprint_t`,
+`include/ebrowser/anti_fingerprint.h`) implements the fingerprinting
+defense an earlier revision of this doc listed as a future milestone.
+The AFP struct is embedded in `eb_privacy_t` and wired to privacy modes
+as documented above ("Mode → AFP-level mapping").
+
+### Level ladder (monotonic)
+
+| Level | Canvas | WebGL | Fonts | Timing | Screen / UA / cores / mem | API blocks |
+|---|---|---|---|---|---|---|
+| `EB_AFP_OFF` | — | — | — | — | — | — |
+| `EB_AFP_STANDARD` (init default) | 2-bit noise | vendor → "WebKit" | restricted | 100µs jitter, 1ms resolution | — | WebRTC IP, battery, bluetooth, USB; audio noise 0.0001 |
+| `EB_AFP_STRICT` | 4-bit noise | vendor+renderer → "WebKit", extensions blocked | restricted | 500µs jitter, 5ms resolution | 1920×1080×24, UA + 4 cores + 8 GB spoofed | all of STANDARD; audio noise 0.001 |
+| `EB_AFP_TOR_LIKE` | readback blocked | vendor+renderer → "Mozilla", extensions blocked | restricted | 1ms jitter, 100ms resolution | 1000×1000×24, fixed UA pool, 2 cores / 8 GB | all of STRICT |
+
+Each level is a superset of the previous: raising the level never
+*removes* a protection.
+
+### Fail-closed construction
+
+1. `eb_afp_init` memsets the struct to zero **before** applying the
+   level — a fresh struct can never sit partially configured, and every
+   spoofed value is a fixed constant, never the real device value.
+2. Every entry point is NULL-safe: a missing struct disables defenses,
+   never crashes or half-applies them.
+3. `eb_afp_calculate_score` lets CI assert the ladder — protections on
+   ⇒ low entropy score; protections off ⇒ high.
+
+### Integration (landed 2026-10-11)
+
+`eb_priv_set_mode` drives `eb_afp_set_level` via the mode → AFP-level mapping
+recorded above. Previously, embedders had to call `eb_afp_set_level`
+explicitly — now the privacy engine owns the ladder end-to-end.
+
+# === docs/security-advisory-v2.0.0.md ===
+
+# Security Advisory — eBrowser v2.0.0
+
+**Date:** 2026-04-27
+**Severity:** Informational (no vulnerabilities)
+**Affects:** eBrowser v2.0.0
+
+## Summary
+
+eBrowser v2.0.0 ("Security Fortress") is a major release introducing 15 new
+security and privacy modules. This advisory documents the security posture
+of the release.
+
+## Vulnerability Status
+
+**No known vulnerabilities at time of release.**
+
+### Testing Performed
+
+| Test Type | Coverage | Result |
+|-----------|----------|--------|
+| Unit Tests | 138 test cases across 8 suites | All passing |
+| Fuzz Testing | 5 targets (HTML, CSS, URL, XSS, Firewall) | No crashes found |
+| AddressSanitizer | All fuzz targets | No issues |
+| UndefinedBehaviorSanitizer | All fuzz targets | No issues |
+| Valgrind (memcheck) | All 8 test suites | Clean |
+| Static Analysis (cppcheck) | Full source tree | No critical issues |
+| CodeQL | Automated on every push | Clean |
+
+### Attack Surface Analysis
+
+| Component | Input Source | Sanitization | Risk |
+|-----------|-------------|-------------|------|
+| HTML Parser | Untrusted web content | XSS scanner + sanitizer | Medium |
+| CSS Parser | Untrusted stylesheets | Length/value bounds checking | Low |
+| URL Parser | User input + links | Security check + privacy clean | Medium |
+| JS Engine | Web scripts | Execution timeout + memory limit | High |
+| Network | HTTP responses | TLS verification + CSP + HSTS | Medium |
+| Extensions | Third-party code | Sandboxed + permission-gated | Medium |
+| DNS | Network responses | DoH encryption + rebinding check | Low |
+
+### Cryptographic Inventory
+
+| Algorithm | Usage | Implementation | Status |
+|-----------|-------|---------------|--------|
+| SHA-256 | Content hashing, HMAC | Pure C (custom) | Verified against test vectors |
+| AES-128-CBC | Secure storage | Pure C (custom) | Verified against NIST vectors |
+| HMAC-SHA256 | Message authentication | Pure C (custom) | Verified |
+| PBKDF2 | Key derivation | Pure C (SHA-256 based) | Verified |
+| TLS 1.2/1.3 | Transport security | Structure only (needs backend) | Partial |
+
+**Note:** The pure-C crypto implementations prioritize portability for embedded
+targets. For production desktop use, linking OpenSSL/mbedTLS is recommended for
+hardware-accelerated performance and FIPS compliance.
+
+### Known Limitations
+
+1. **TLS implementation** is structural — actual TLS handshake requires linking
+   a TLS backend (OpenSSL, mbedTLS, or wolfSSL).
+2. **JavaScript engine** is a basic interpreter — not a full V8/SpiderMonkey.
+   Complex web applications will not work.
+3. **Crypto performance** — Pure C SHA-256 is ~47µs/4KB vs ~2µs with AES-NI.
+   Adequate for embedded, link OpenSSL for desktop.
+
+### Compiler Hardening Matrix
+
+| Protection | Linux (GCC) | Linux (Clang) | macOS | Windows (MSVC) |
+|------------|------------|---------------|-------|----------------|
+| Stack Protector | ✓ | ✓ | ✓ | /GS |
+| FORTIFY_SOURCE | ✓ | ✓ | ✓ | N/A |
+| PIE/ASLR | ✓ | ✓ | ✓ | /DYNAMICBASE |
+| Full RELRO | ✓ | ✓ | N/A | N/A |
+| NX Stack | ✓ | ✓ | ✓ | /NXCOMPAT |
+| Stack Clash | ✓ | ✓ | N/A | N/A |
+| Control Flow | N/A | -fsanitize=cfi | N/A | /guard:cf |
+
+## Dependencies
+
+See `sbom/ebrowser-2.0.0.cdx.json` for the full Software Bill of Materials.
+
+| Dependency | Version | License | CVEs |
+|------------|---------|---------|------|
+| LVGL | 9.2 | MIT | None known |
+| SDL2 | 2.x (optional) | Zlib | None critical |
+| libc (system) | System | — | — |
+
+**Total third-party dependencies: 2** (LVGL + optional SDL2)
+**Zero npm/pip/cargo dependencies.**
+
+## Recommendations
+
+1. **Keep updated** — Subscribe to GitHub releases for security patches
+2. **Use Clang** — Enables libFuzzer + additional sanitizers
+3. **Enable all hardening** — Build with `cmake -DCMAKE_BUILD_TYPE=Release`
+4. **Report vulnerabilities** — Email security@embeddedos.org
+5. **Run fuzz tests** — `cmake -DeBrowser_BUILD_FUZZ=ON` before deploying
+
+## Contact
+
+- Security reports: security@embeddedos.org
+- General issues: https://github.com/embeddedos-org/eBrowser/issues
