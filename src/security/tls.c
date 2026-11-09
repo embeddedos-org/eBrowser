@@ -34,6 +34,9 @@
 #ifdef EB_USE_MBEDTLS
 #include "mbedtls/oid.h"
 #include "mbedtls/x509_crt.h"
+#if defined(MBEDTLS_PSA_CRYPTO_C)
+#include "psa/crypto.h"
+#endif
 #ifndef MBEDTLS_PRIVATE
 #define MBEDTLS_PRIVATE(member) member
 #endif
@@ -82,6 +85,20 @@ int eb_tls_init(eb_tls_ctx_t *ctx, const eb_tls_config_t *config) {
     mbedtls_ctr_drbg_init(&ctx->ctr_drbg);
     mbedtls_x509_crt_init(&ctx->cacert);
     mbedtls_net_init(&ctx->server_fd);
+
+#if defined(MBEDTLS_PSA_CRYPTO_C)
+    /* mbedTLS 3.x runs the TLS 1.3 key exchange (and, with
+     * MBEDTLS_USE_PSA_CRYPTO, all TLS crypto) through PSA Crypto, which
+     * must be initialised before the first handshake or every handshake
+     * fails with an internal error. psa_crypto_init() is idempotent. */
+    {
+        psa_status_t pst = psa_crypto_init();
+        if (pst != PSA_SUCCESS) {
+            fprintf(stderr, "eb_tls_init: psa_crypto_init failed: %d\n", (int)pst);
+            return -1;
+        }
+    }
+#endif
 
     /* Seed the PRNG */
     int ret = mbedtls_ctr_drbg_seed(&ctx->ctr_drbg, mbedtls_entropy_func,

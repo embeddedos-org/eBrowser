@@ -3,6 +3,11 @@
 #include "eBrowser/tls.h"
 #include <stdio.h>
 #include <string.h>
+#if defined(EB_USE_MBEDTLS) && !defined(_WIN32)
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 static int s_pass = 0, s_fail = 0;
 #define TEST(name) static void name(void)
@@ -206,6 +211,38 @@ TEST(test_tls_set_hostname_after_init) {
     eb_tls_free(&ctx);
 }
 
+#if defined(EB_USE_MBEDTLS) && !defined(_WIN32)
+/* mbedTLS 3.x does its TLS 1.3 key exchange through PSA Crypto, which must
+ * be initialised with psa_crypto_init() before the first handshake. Without
+ * it the client fails while building its ClientHello and nothing reaches
+ * the wire, so every HTTPS request fails. The peer here never answers (its
+ * write side is shut, so the client sees EOF instead of blocking): the
+ * handshake fails either way, but a ClientHello record must have been sent. */
+TEST(test_tls_handshake_sends_client_hello) {
+    int sv[2];
+    ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0);
+    shutdown(sv[1], SHUT_WR);
+
+    eb_tls_ctx_t ctx;
+    int init_rc = eb_tls_init(&ctx, NULL);
+    int host_rc = eb_tls_set_hostname(&ctx, "localhost");
+    int hs_rc = eb_tls_handshake(&ctx, sv[0]);
+    eb_tls_free(&ctx);                     /* closes sv[0] */
+
+    unsigned char rec[5] = {0};
+    fcntl(sv[1], F_SETFL, O_NONBLOCK);
+    ssize_t n = recv(sv[1], rec, sizeof(rec), 0);
+    close(sv[1]);
+
+    ASSERT(init_rc == 0);
+    ASSERT(host_rc == 0);
+    ASSERT(hs_rc != 0);                    /* the peer sent nothing back */
+    ASSERT(n == (ssize_t)sizeof(rec));     /* a TLS record was written */
+    ASSERT(rec[0] == 0x16);                /* content type: handshake */
+    ASSERT(rec[1] == 0x03);                /* record version 3.x */
+}
+#endif
+
 int main(void) {
     printf("=== TLS Tests ===\n");
     RUN(test_config_default); RUN(test_tls_init); RUN(test_tls_init_with_config);
@@ -218,6 +255,9 @@ int main(void) {
     RUN(test_tls_init_free_lifecycle); RUN(test_tls_init_default_config);
     RUN(test_tls_init_custom_config); RUN(test_tls_init_close_free);
     RUN(test_tls_set_hostname_after_init);
+#if defined(EB_USE_MBEDTLS) && !defined(_WIN32)
+    RUN(test_tls_handshake_sends_client_hello);
+#endif
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }
