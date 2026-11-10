@@ -31,6 +31,29 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
 
+  # The same suite on macOS. The native build below runs there with
+  # BUILD_TESTING=OFF, so a test target that does not compile on macOS
+  # (tests/http2_server.c and its Linux-only epoll include) went unnoticed.
+  test-macos:
+    name: Native C tests (macos-15)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=ON
+          -DeBrowser_USE_MBEDTLS=ON
+          -DeBrowser_BUILD_STANDALONE=OFF
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel 2
+
+      - name: Run tests
+        run: ctest --test-dir build -C Debug --output-on-failure --no-tests=error
+
   build:
     name: Native build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
