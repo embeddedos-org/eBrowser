@@ -102,11 +102,21 @@ target_link_libraries(benchmark PRIVATE
 target_include_directories(benchmark PRIVATE /include)
 
 # --- HTTP/2 Server + Load Test ---
-add_executable(http2_server http2_server.c)
-target_link_libraries(http2_server PRIVATE
-    eb_perf eb_memory_safety eb_firewall eb_anti_fingerprint
-    eb_privacy eBrowser_security eb_extensions eb_ui pthread m)
-target_include_directories(http2_server PRIVATE /include)
+# http2_server.c is an epoll server, and epoll exists only on Linux. Built
+# unconditionally, its sys/epoll.h include stopped every BUILD_TESTING=ON
+# build on macOS before a single test could run. It is a demo, not a ctest
+# test, so where there is no epoll it is skipped and said so.
+include(CheckIncludeFile)
+check_include_file(sys/epoll.h EB_HAVE_SYS_EPOLL_H)
+if(EB_HAVE_SYS_EPOLL_H)
+    add_executable(http2_server http2_server.c)
+    target_link_libraries(http2_server PRIVATE
+        eb_perf eb_memory_safety eb_firewall eb_anti_fingerprint
+        eb_privacy eBrowser_security eb_extensions eb_ui pthread m)
+    target_include_directories(http2_server PRIVATE /include)
+else()
+    message(STATUS "tests: http2_server not built (no sys/epoll.h on this platform)")
+endif()
 
 add_executable(load_test load_test.c)
 target_link_libraries(load_test PRIVATE pthread)
