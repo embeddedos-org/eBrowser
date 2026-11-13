@@ -217,6 +217,22 @@ bool eb_css_parse(eb_stylesheet_t *ss, const char *css, size_t len) {
     return true;
 }
 
+/* True if the space-separated class list contains name as a whole entry.
+ * strstr() on the list also matched part of a longer name, so .hidden
+ * applied to class="not-hidden" and .btn to class="btn-primary". */
+static bool class_list_contains(const char *list, const char *name) {
+    size_t n = name ? strlen(name) : 0;
+    if (!list || n == 0) return false;
+    const char *p = list;
+    while (*p) {
+        while (*p && isspace((unsigned char)*p)) p++;
+        const char *start = p;
+        while (*p && !isspace((unsigned char)*p)) p++;
+        if ((size_t)(p - start) == n && strncmp(start, name, n) == 0) return true;
+    }
+    return false;
+}
+
 static bool selector_matches(const char *selector, const char *tag, const char *id, const char *class_name) {
     if (!selector||!tag) return false;
     const char *last = selector+strlen(selector)-1;
@@ -230,7 +246,7 @@ static bool selector_matches(const char *selector, const char *tag, const char *
     const char *p = part; bool has_constraint = false;
     while (*p) {
         if (*p=='#') { has_constraint=true; p++; char id_buf[EB_CSS_MAX_TAG_LEN]={0}; size_t i=0; while (*p&&*p!='.'&&*p!='#'&&i<EB_CSS_MAX_TAG_LEN-1) id_buf[i++]=*p++; if (!id||strcmp(id_buf,id)!=0) return false; }
-        else if (*p=='.') { has_constraint=true; p++; char cls[EB_CSS_MAX_TAG_LEN]={0}; size_t i=0; while (*p&&*p!='.'&&*p!='#'&&i<EB_CSS_MAX_TAG_LEN-1) cls[i++]=*p++; if (!class_name||strstr(class_name,cls)==NULL) return false; }
+        else if (*p=='.') { has_constraint=true; p++; char cls[EB_CSS_MAX_TAG_LEN]={0}; size_t i=0; while (*p&&*p!='.'&&*p!='#'&&i<EB_CSS_MAX_TAG_LEN-1) cls[i++]=*p++; if (!class_list_contains(class_name,cls)) return false; }
         else if (*p=='*') { has_constraint=true; p++; }
         else if (isalpha((unsigned char)*p)) { has_constraint=true; char tb[EB_CSS_MAX_TAG_LEN]={0}; size_t i=0; while (*p&&isalnum((unsigned char)*p)&&i<EB_CSS_MAX_TAG_LEN-1) tb[i++]=(char)tolower((unsigned char)*p++); if (strcasecmp(tb,tag)!=0) return false; }
         else { p++; }

@@ -272,6 +272,35 @@ TEST(test_resolve_class_selector) {
     ASSERT(s.color.g == 128);
 }
 
+/* A class selector names one whole class in the element's space-separated
+ * class list. It was matched with strstr() on the whole attribute, so
+ * .hidden hid class="not-hidden" and .btn styled class="btn-primary". */
+TEST(test_resolve_class_selector_whole_name) {
+    const char *css = ".hidden { display: none; } .btn { color: red; } .a.b { text-align: center; }";
+    eb_stylesheet_t ss;
+    eb_css_init_stylesheet(&ss);
+    eb_css_parse(&ss, css, strlen(css));
+
+    eb_computed_style_t s = eb_css_resolve_style(&ss, "div", NULL, "not-hidden");
+    ASSERT(s.display == EB_DISPLAY_BLOCK);
+    s = eb_css_resolve_style(&ss, "div", NULL, "hidden-xs");
+    ASSERT(s.display == EB_DISPLAY_BLOCK);
+    s = eb_css_resolve_style(&ss, "span", NULL, "btn-primary");
+    ASSERT(s.color.r == 0);
+    s = eb_css_resolve_style(&ss, "span", NULL, "ab");
+    ASSERT(s.text_align == EB_TEXT_ALIGN_LEFT);
+
+    /* Whole names still match, anywhere in the list. */
+    s = eb_css_resolve_style(&ss, "div", NULL, "card hidden");
+    ASSERT(s.display == EB_DISPLAY_NONE);
+    s = eb_css_resolve_style(&ss, "span", NULL, "large\tbtn");
+    ASSERT(s.color.r == 255);
+    s = eb_css_resolve_style(&ss, "span", NULL, "b x a");
+    ASSERT(s.text_align == EB_TEXT_ALIGN_CENTER);
+    s = eb_css_resolve_style(&ss, "span", NULL, "a");
+    ASSERT(s.text_align == EB_TEXT_ALIGN_LEFT);
+}
+
 TEST(test_resolve_display_property) {
     const char *css = ".hidden { display: none; } .flex { display: flex; }";
     eb_stylesheet_t ss;
@@ -413,6 +442,7 @@ int main(void) {
     RUN(test_resolve_tag_selector);
     RUN(test_resolve_id_selector);
     RUN(test_resolve_class_selector);
+    RUN(test_resolve_class_selector_whole_name);
     RUN(test_resolve_display_property);
     RUN(test_resolve_text_align);
     RUN(test_resolve_margin_shorthand);
