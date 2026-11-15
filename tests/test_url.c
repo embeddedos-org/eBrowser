@@ -208,6 +208,73 @@ TEST(test_resolve_clears_query_fragment) {
     ASSERT(out.fragment[0] == '\0');
 }
 
+// RFC 3986 section 5.4 reference resolution examples, base "http://a/b/c/d;p?q".
+// eb_url_t always has a path, so "//g" comes back as "http://g/".
+TEST(test_resolve_rfc3986_examples) {
+    static const char *cases[][2] = {
+        {"g",          "http://a/b/c/g"},
+        {"./g",        "http://a/b/c/g"},
+        {"g/",         "http://a/b/c/g/"},
+        {"/g",         "http://a/g"},
+        {"//g",        "http://g/"},
+        {"?y",         "http://a/b/c/d;p?y"},
+        {"g?y",        "http://a/b/c/g?y"},
+        {"#s",         "http://a/b/c/d;p?q#s"},
+        {"g#s",        "http://a/b/c/g#s"},
+        {"g?y#s",      "http://a/b/c/g?y#s"},
+        {"",           "http://a/b/c/d;p?q"},
+        {".",          "http://a/b/c/"},
+        {"./",         "http://a/b/c/"},
+        {"..",         "http://a/b/"},
+        {"../",        "http://a/b/"},
+        {"../g",       "http://a/b/g"},
+        {"../..",      "http://a/"},
+        {"../../",     "http://a/"},
+        {"../../g",    "http://a/g"},
+        {"../../../g", "http://a/g"},
+        {"/./g",       "http://a/g"},
+        {"/../g",      "http://a/g"},
+        {"g.",         "http://a/b/c/g."},
+        {"..g",        "http://a/b/c/..g"},
+        {"./../g",     "http://a/b/g"},
+        {"g/./h",      "http://a/b/c/g/h"},
+        {"g/../h",     "http://a/b/c/h"},
+    };
+    eb_url_t base, out;
+    char buf[EB_URL_MAX_FULL];
+    int wrong = 0;
+    ASSERT(eb_url_parse("http://a/b/c/d;p?q", &base));
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        ASSERT(eb_url_resolve(&base, cases[i][0], &out));
+        eb_url_to_string(&out, buf, sizeof(buf));
+        if (strcmp(buf, cases[i][1]) != 0) {
+            printf("\n    \"%s\" -> %s (expected %s)", cases[i][0], buf, cases[i][1]);
+            wrong++;
+        }
+    }
+    if (wrong) printf("\n    ");
+    ASSERT(wrong == 0);
+}
+
+TEST(test_resolve_splits_query_and_fragment) {
+    eb_url_t base, out;
+    eb_url_parse("https://example.com/dir/page.html", &base);
+    ASSERT(eb_url_resolve(&base, "/search?q=x#top", &out));
+    ASSERT(strcmp(out.path, "/search") == 0);
+    ASSERT(strcmp(out.query, "q=x") == 0);
+    ASSERT(strcmp(out.fragment, "top") == 0);
+}
+
+TEST(test_resolve_network_path_keeps_scheme) {
+    eb_url_t base, out;
+    eb_url_parse("https://example.com/dir/page.html", &base);
+    ASSERT(eb_url_resolve(&base, "//cdn.example.org:8443/lib.js", &out));
+    ASSERT(strcmp(out.scheme, "https") == 0);
+    ASSERT(strcmp(out.host, "cdn.example.org") == 0);
+    ASSERT(out.port == 8443);
+    ASSERT(strcmp(out.path, "/lib.js") == 0);
+}
+
 // --- Real-world URLs ---
 
 TEST(test_parse_google_search) {
@@ -264,6 +331,9 @@ int main(void) {
     RUN(test_resolve_relative_path);
     RUN(test_resolve_null);
     RUN(test_resolve_clears_query_fragment);
+    RUN(test_resolve_rfc3986_examples);
+    RUN(test_resolve_splits_query_and_fragment);
+    RUN(test_resolve_network_path_keeps_scheme);
     RUN(test_parse_google_search);
     RUN(test_parse_github_url);
     RUN(test_parse_localhost);
