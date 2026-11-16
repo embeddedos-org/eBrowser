@@ -106,6 +106,36 @@ TEST(test_tokenizer_attributes_single_quotes) {
     ASSERT(strcmp(t.attrs[0].value, "https://test.org") == 0);
 }
 
+TEST(test_tokenizer_unquoted_attr_with_slash) {
+    /* An unquoted value ends at whitespace or '>', not at '/'. */
+    const char *html = "<a href=/docs/intro class=nav>Docs</a>";
+    eb_tokenizer_t tok;
+    eb_tokenizer_init(&tok, html, strlen(html));
+    eb_html_token_t t = eb_tokenizer_next(&tok);
+    ASSERT(t.type == EB_TOK_START_TAG);
+    ASSERT(strcmp(t.tag, "a") == 0);
+    ASSERT(t.attr_count == 2);
+    ASSERT(strcmp(t.attrs[0].name, "href") == 0);
+    ASSERT(strcmp(t.attrs[0].value, "/docs/intro") == 0);
+    ASSERT(strcmp(t.attrs[1].value, "nav") == 0);
+    t = eb_tokenizer_next(&tok);
+    ASSERT(t.type == EB_TOK_TEXT);
+    ASSERT(strcmp(t.text, "Docs") == 0);
+}
+
+TEST(test_tokenizer_unquoted_attr_then_self_closing) {
+    /* A '/' after whitespace still marks the tag self-closing. */
+    const char *html = "<img src=img/logo.png alt=Logo />";
+    eb_tokenizer_t tok;
+    eb_tokenizer_init(&tok, html, strlen(html));
+    eb_html_token_t t = eb_tokenizer_next(&tok);
+    ASSERT(t.type == EB_TOK_SELF_CLOSING_TAG);
+    ASSERT(t.attr_count == 2);
+    ASSERT(strcmp(t.attrs[0].value, "img/logo.png") == 0);
+    ASSERT(strcmp(t.attrs[1].value, "Logo") == 0);
+    ASSERT(eb_tokenizer_next(&tok).type == EB_TOK_EOF);
+}
+
 TEST(test_tokenizer_case_insensitive_tags) {
     const char *html = "<DIV><P>text</P></DIV>";
     eb_tokenizer_t tok;
@@ -326,6 +356,19 @@ TEST(test_parse_data_attributes) {
     eb_dom_destroy(doc);
 }
 
+TEST(test_parse_unquoted_link) {
+    const char *html = "<p><a href=/about>About us</a> and more</p>";
+    eb_dom_node_t *doc = eb_html_parse(html, strlen(html));
+    ASSERT(doc != NULL);
+    eb_dom_node_t *a = eb_dom_find_by_tag(doc, "a");
+    ASSERT(a != NULL);
+    const char *href = eb_dom_get_attribute(a, "href");
+    ASSERT(href != NULL && strcmp(href, "/about") == 0);
+    ASSERT(a->child_count == 1);
+    ASSERT(strcmp(a->children[0]->text, "About us") == 0);
+    eb_dom_destroy(doc);
+}
+
 TEST(test_parse_whitespace_handling) {
     const char *html = "<p>   Hello   World   </p>";
     eb_dom_node_t *doc = eb_html_parse(html, strlen(html));
@@ -374,6 +417,8 @@ int main(void) {
     RUN(test_tokenizer_comment);
     RUN(test_tokenizer_attributes_double_quotes);
     RUN(test_tokenizer_attributes_single_quotes);
+    RUN(test_tokenizer_unquoted_attr_with_slash);
+    RUN(test_tokenizer_unquoted_attr_then_self_closing);
     RUN(test_tokenizer_case_insensitive_tags);
     RUN(test_void_elements_list);
     RUN(test_non_void_elements);
@@ -388,6 +433,7 @@ int main(void) {
     RUN(test_parse_comments_preserved);
     RUN(test_parse_inline_styles);
     RUN(test_parse_data_attributes);
+    RUN(test_parse_unquoted_link);
     RUN(test_parse_whitespace_handling);
     RUN(test_parse_empty_tags);
     RUN(test_parse_semantic_html5);

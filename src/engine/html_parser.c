@@ -80,9 +80,11 @@ static void parse_attr_value(eb_tokenizer_t *tok, char *out, size_t max) {
             out[i++] = c;
         }
     } else {
+        /* An unquoted value ends at whitespace or '>' (the HTML "attribute
+         * value (unquoted) state"); '/' is part of it: href=/docs. */
         while (tok->pos < tok->len && i < max - 1) {
             char c = peek(tok);
-            if (isspace((unsigned char)c) || c == '>' || c == '/') break;
+            if (isspace((unsigned char)c) || c == '>') break;
             out[i++] = advance(tok);
         }
     }
