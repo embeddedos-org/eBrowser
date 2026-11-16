@@ -76,8 +76,13 @@ jobs:
           path: /tmp/perf.json
           retention-days: 90
 
+      # Fork PRs run with a read-only GITHUB_TOKEN, so the comment POST
+      # below gets 403 "Resource not accessible by integration" and fails
+      # the whole check even when all metrics pass (e.g. PR #58, run
+      # 43728336842). Skip the comment on fork PRs; results stay in the
+      # uploaded perf-results artifact. The metrics gate below is untouched.
       - name: Comment on PR with results
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/github-script@v7
         with:
           script: |
