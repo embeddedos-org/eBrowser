@@ -93,22 +93,85 @@ void eb_url_to_string(const eb_url_t *url, char *buf, size_t buf_len) {
     }
 }
 
+/* Copy n bytes of src into dst (capacity cap), truncating, always terminated. */
+static void url_copy_span(char *dst, size_t cap, const char *src, size_t n) {
+    if (n >= cap) n = cap - 1;
+    memcpy(dst, src, n);
+    dst[n] = '\0';
+}
+
+/* RFC 3986 section 5.2.4: drop "." segments and let ".." remove the segment
+ * before it, in place. path starts with '/'; the result is never longer. */
+static void url_remove_dot_segments(char *path) {
+    char out[EB_URL_MAX_PATH];
+    size_t olen = 0;
+    const char *p = path;
+
+    while (*p == '/') {
+        const char *seg = p + 1;
+        const char *end = seg;
+        while (*end && *end != '/') end++;
+        size_t slen = (size_t)(end - seg);
+
+        if (slen == 1 && seg[0] == '.') {
+            if (!*end) out[olen++] = '/';
+        } else if (slen == 2 && seg[0] == '.' && seg[1] == '.') {
+            while (olen > 0 && out[olen - 1] != '/') olen--;
+            if (olen > 0) olen--;
+            if (!*end) out[olen++] = '/';
+        } else if (olen + 1 + slen < sizeof(out)) {
+            out[olen++] = '/';
+            memcpy(out + olen, seg, slen);
+            olen += slen;
+        }
+        p = end;
+    }
+    if (olen == 0) out[olen++] = '/';
+    out[olen] = '\0';
+    memcpy(path, out, olen + 1);
+}
+
+/* Resolve a reference against base as RFC 3986 section 5.2.2 does. */
 bool eb_url_resolve(const eb_url_t *base, const char *relative, eb_url_t *out) {
     if (!base || !relative || !out) return false;
 
     if (strstr(relative, "://")) return eb_url_parse(relative, out);
 
+    /* "//host/path": a new host, same scheme. */
+    if (relative[0] == '/' && relative[1] == '/') {
+        char full[EB_URL_MAX_FULL];
+        snprintf(full, sizeof(full), "%s:%s", base->scheme, relative);
+        return eb_url_parse(full, out);
+    }
+
+    size_t path_len = strcspn(relative, "?#");
+    const char *query = relative[path_len] == '?' ? relative + path_len + 1 : NULL;
+    const char *hash = strchr(relative + path_len, '#');
+
     *out = *base;
-    out->query[0] = '\0';
     out->fragment[0] = '\0';
 
-    if (relative[0] == '/') {
-        strncpy(out->path, relative, EB_URL_MAX_PATH - 1);
-    } else {
-        char *last_slash = strrchr(out->path, '/');
-        if (last_slash) *(last_slash + 1) = '\0';
-        size_t plen = strlen(out->path);
-        strncat(out->path, relative, EB_URL_MAX_PATH - 1 - plen);
+    if (path_len > 0 || query) {
+        out->query[0] = '\0';
+        if (query)
+            url_copy_span(out->query, EB_URL_MAX_QUERY, query,
+                          hash ? (size_t)(hash - query) : strlen(query));
     }
+
+    if (path_len > 0) {
+        if (relative[0] == '/') {
+            url_copy_span(out->path, EB_URL_MAX_PATH, relative, path_len);
+        } else {
+            /* Merge: the base path up to its last '/', then the reference. */
+            char *last_slash = strrchr(out->path, '/');
+            if (last_slash) *(last_slash + 1) = '\0';
+            else url_copy_span(out->path, EB_URL_MAX_PATH, "/", 1);
+            size_t plen = strlen(out->path);
+            url_copy_span(out->path + plen, EB_URL_MAX_PATH - plen, relative, path_len);
+        }
+        url_remove_dot_segments(out->path);
+    }
+
+    if (hash) url_copy_span(out->fragment, EB_URL_MAX_FRAGMENT, hash + 1, strlen(hash + 1));
     return true;
 }
