@@ -106,18 +106,51 @@ int eb_bm_save(const eb_bookmark_mgr_t *bm, const char *path) {
     fclose(f); return bm->count;
 }
 
+/* Parse one "id|type|title|url|parent_id" line written by eb_bm_save().
+ * The title may contain '|', so id and type are taken from the left,
+ * parent_id from the right, and the url is what follows the last '|' in
+ * between (a '|' in a URL is normally percent-encoded). */
+static bool parse_bm_line(char *line, eb_bookmark_t *b) {
+    line[strcspn(line, "\r\n")] = '\0';
+    int type, off = 0;
+    if (sscanf(line, "%d|%d|%n", &b->id, &type, &off) != 2 || off == 0) return false;
+    if (type < EB_BM_BOOKMARK || type > EB_BM_SEPARATOR) return false;
+    b->type = (eb_bm_type_t)type;
+    char *mid = line + off;
+    char *last = strrchr(mid, '|');
+    if (!last) return false;
+    *last = '\0';
+    char *end = NULL;
+    long pid = strtol(last + 1, &end, 10);
+    if (end == last + 1 || *end != '\0') return false;
+    b->parent_id = (int)pid;
+    char *sep = strrchr(mid, '|');
+    if (!sep) return false;
+    *sep = '\0';
+    strncpy(b->title, mid, EB_BM_TITLE_MAX-1);
+    strncpy(b->url, sep + 1, EB_BM_URL_MAX-1);
+    return true;
+}
+
 int eb_bm_load(eb_bookmark_mgr_t *bm, const char *path) {
     if (!bm || !path) return -1;
     FILE *f = fopen(path, "r"); if (!f) return -1;
     char line[4096]; int n = 0;
-    fgets(line, sizeof(line), f); /* skip header */
-    while (fgets(line, sizeof(line), f) && bm->count < EB_BM_MAX_ITEMS) {
-        eb_bookmark_t *b = &bm->items[bm->count];
-        memset(b, 0, sizeof(*b));
-        if (sscanf(line, "%d|%d|", &b->id, (int*)&b->type) == 2) {
-            bm->count++; n++;
-            if (b->id >= bm->next_id) bm->next_id = b->id + 1;
+    if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; } /* skip header */
+    while (fgets(line, sizeof(line), f)) {
+        eb_bookmark_t tmp;
+        memset(&tmp, 0, sizeof(tmp));
+        if (!parse_bm_line(line, &tmp)) continue;
+        /* An item already present (the root folders eb_bm_init() creates)
+         * is replaced, not added a second time. */
+        eb_bookmark_t *b = find_bm(bm, tmp.id);
+        if (!b) {
+            if (bm->count >= EB_BM_MAX_ITEMS) break;
+            b = &bm->items[bm->count++];
         }
+        *b = tmp;
+        n++;
+        if (b->id >= bm->next_id) bm->next_id = b->id + 1;
     }
     fclose(f); return n;
 }
