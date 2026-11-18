@@ -66,6 +66,9 @@ void eb_tabmgr_close(eb_tab_manager_t *tm, int id) {
         }
         for (int j = i; j < tm->tab_count-1; j++) tm->tabs[j] = tm->tabs[j+1];
         tm->tab_count--;
+        /* active_tab is an index: tabs after i moved one slot left, so an
+         * active tab after the closed one moves with them. */
+        if (i < tm->active_tab) tm->active_tab--;
         if (tm->active_tab >= tm->tab_count) tm->active_tab = tm->tab_count - 1;
         if (tm->tab_count == 0) eb_tabmgr_new(tm, NULL, false);
         return;

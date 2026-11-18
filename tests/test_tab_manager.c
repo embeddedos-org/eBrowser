@@ -92,6 +92,53 @@ TEST(test_close_tab) {
     eb_tabmgr_destroy(&tm);
 }
 
+TEST(test_close_tab_before_active_keeps_active) {
+    static eb_tab_manager_t tm;
+    eb_tabmgr_init(&tm);
+    int a = eb_tabmgr_new(&tm, "https://a.com", false);
+    eb_tabmgr_new(&tm, "https://b.com", false);
+    int c = eb_tabmgr_new(&tm, "https://c.com", false);
+    eb_tabmgr_new(&tm, "https://d.com", false);
+    eb_tabmgr_switch(&tm, c);
+    ASSERT(tm.tabs[tm.active_tab].id == c);
+    /* Closing a tab to the left of the active one must not change which
+     * tab is active, only its index. */
+    eb_tabmgr_close(&tm, a);
+    ASSERT(tm.tab_count == 3);
+    ASSERT(tm.tabs[tm.active_tab].id == c);
+    eb_tabmgr_destroy(&tm);
+}
+
+TEST(test_close_tab_after_active_keeps_active) {
+    static eb_tab_manager_t tm;
+    eb_tabmgr_init(&tm);
+    int a = eb_tabmgr_new(&tm, "https://a.com", false);
+    eb_tabmgr_new(&tm, "https://b.com", false);
+    int c = eb_tabmgr_new(&tm, "https://c.com", false);
+    eb_tabmgr_switch(&tm, a);
+    eb_tabmgr_close(&tm, c);
+    ASSERT(tm.tab_count == 2);
+    ASSERT(tm.tabs[tm.active_tab].id == a);
+    eb_tabmgr_destroy(&tm);
+}
+
+TEST(test_close_active_tab_activates_right_neighbour) {
+    static eb_tab_manager_t tm;
+    eb_tabmgr_init(&tm);
+    eb_tabmgr_new(&tm, "https://a.com", false);
+    int b = eb_tabmgr_new(&tm, "https://b.com", false);
+    int c = eb_tabmgr_new(&tm, "https://c.com", false);
+    eb_tabmgr_switch(&tm, b);
+    eb_tabmgr_close(&tm, b);
+    ASSERT(tm.tab_count == 2);
+    ASSERT(tm.tabs[tm.active_tab].id == c);
+    /* Closing the last, active tab falls back to its left neighbour. */
+    eb_tabmgr_close(&tm, c);
+    ASSERT(tm.tab_count == 1);
+    ASSERT(tm.active_tab == 0);
+    eb_tabmgr_destroy(&tm);
+}
+
 TEST(test_close_last_tab_creates_new) {
     static eb_tab_manager_t tm;
     eb_tabmgr_init(&tm);
@@ -280,6 +327,9 @@ int main(void) {
     RUN(test_init); RUN(test_new_tab); RUN(test_new_tab_default_url);
     RUN(test_incognito_tab); RUN(test_multiple_tabs); RUN(test_switch_tab);
     RUN(test_close_tab); RUN(test_close_last_tab_creates_new);
+    RUN(test_close_tab_before_active_keeps_active);
+    RUN(test_close_tab_after_active_keeps_active);
+    RUN(test_close_active_tab_activates_right_neighbour);
     RUN(test_close_saves_to_recently_closed); RUN(test_reopen_closed);
     RUN(test_duplicate_tab); RUN(test_pin_tab); RUN(test_mute_tab);
     RUN(test_zoom); RUN(test_tab_groups); RUN(test_group_collapse);
