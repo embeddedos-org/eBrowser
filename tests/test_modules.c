@@ -67,6 +67,41 @@ TEST(test_cache_basic) {
     eb_cache_clear(&cache);
 }
 
+TEST(test_cache_reuses_freed_slots) {
+    /* Fill every slot, then drop every entry: the cache is empty again, so a
+     * new URL must be cached. Before the fix the freed slots were never
+     * reused and every later put of a new URL returned false. */
+    static eb_cache_t cache;
+    char url[64];
+    const uint8_t data[] = "x";
+    eb_cache_init(&cache, 1024 * 1024);
+    for (int i = 0; i < EB_CACHE_MAX_ENTRIES; i++) {
+        snprintf(url, sizeof(url), "http://example.com/%d", i);
+        ASSERT(eb_cache_put(&cache, url, data, sizeof(data), NULL, 0));
+    }
+    for (int i = 0; i < EB_CACHE_MAX_ENTRIES; i++) {
+        snprintf(url, sizeof(url), "http://example.com/%d", i);
+        ASSERT(eb_cache_invalidate(&cache, url));
+    }
+    ASSERT(eb_cache_size(&cache) == 0);
+    ASSERT(eb_cache_put(&cache, "http://example.org/new", data, sizeof(data), NULL, 0));
+    ASSERT(eb_cache_get(&cache, "http://example.org/new") != NULL);
+
+    /* A full cache makes room for a new URL by evicting the least recently
+     * used entry, and the new entry takes that slot. */
+    eb_cache_clear(&cache);
+    for (int i = 0; i < EB_CACHE_MAX_ENTRIES; i++) {
+        snprintf(url, sizeof(url), "http://example.com/%d", i);
+        ASSERT(eb_cache_put(&cache, url, data, sizeof(data), "old-etag", 0));
+    }
+    ASSERT(eb_cache_put(&cache, "http://example.org/next", data, sizeof(data), NULL, 0));
+    eb_cache_entry_t *e = eb_cache_get(&cache, "http://example.org/next");
+    ASSERT(e != NULL);
+    ASSERT(e->etag[0] == '\0');
+    ASSERT(eb_cache_size(&cache) == (size_t)EB_CACHE_MAX_ENTRIES * sizeof(data));
+    eb_cache_clear(&cache);
+}
+
 TEST(test_cookies_basic) {
     eb_cookie_jar_t jar;
     eb_cookie_jar_init(&jar);
@@ -181,6 +216,7 @@ int main(void) {
     RUN(test_js_eval_console);
     RUN(test_js_timers);
     RUN(test_cache_basic);
+    RUN(test_cache_reuses_freed_slots);
     RUN(test_cookies_basic);
     RUN(test_cookies_set);
     RUN(test_logger);
