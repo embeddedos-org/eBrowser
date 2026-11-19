@@ -140,12 +140,64 @@ TEST(test_get_nonexistent) {
     eb_bm_destroy(&bm);
 }
 
+/* The browser runs eb_bm_init() and then eb_bm_load() on every start, so a
+ * save followed by that sequence must give back the same bookmarks. */
+TEST(test_save_load_round_trip) {
+    static eb_bookmark_mgr_t bm, loaded;
+    const char *path = "test_bookmark_round_trip.txt";
+    eb_bm_init(&bm);
+    int work = eb_bm_add_folder(&bm, "Work", 1);
+    int ex = eb_bm_add(&bm, "Example", "https://example.com/a?b=c", 1);
+    int docs = eb_bm_add(&bm, "Docs | Reference", "https://docs.example.org/", work);
+    int other = eb_bm_add(&bm, "Other", "https://other.example/", 2);
+    ASSERT(eb_bm_save(&bm, path) == bm.count);
+
+    eb_bm_init(&loaded);
+    ASSERT(eb_bm_load(&loaded, path) == bm.count);
+    remove(path);
+    ASSERT(loaded.count == bm.count);   /* no second copy of the root folders */
+
+    eb_bookmark_t *b = eb_bm_get(&loaded, ex);
+    ASSERT(b != NULL);
+    ASSERT(b->type == EB_BM_BOOKMARK);
+    ASSERT(strcmp(b->title, "Example") == 0);
+    ASSERT(strcmp(b->url, "https://example.com/a?b=c") == 0);
+    ASSERT(b->parent_id == 1);
+
+    b = eb_bm_get(&loaded, docs);
+    ASSERT(b != NULL);
+    ASSERT(strcmp(b->title, "Docs | Reference") == 0);
+    ASSERT(strcmp(b->url, "https://docs.example.org/") == 0);
+    ASSERT(b->parent_id == work);
+
+    b = eb_bm_get(&loaded, work);
+    ASSERT(b != NULL);
+    ASSERT(b->type == EB_BM_FOLDER);
+    ASSERT(strcmp(b->title, "Work") == 0);
+    ASSERT(b->url[0] == '\0');
+    ASSERT(b->parent_id == 1);
+
+    b = eb_bm_get(&loaded, other);
+    ASSERT(b != NULL && b->parent_id == 2);
+    ASSERT(strcmp(eb_bm_get(&loaded, 1)->title, "Bookmarks Bar") == 0);
+    ASSERT(eb_bm_exists_url(&loaded, "https://example.com/a?b=c"));
+
+    int kids[8];
+    ASSERT(eb_bm_get_children(&loaded, 1, kids, 8) == 2); /* Work, Example */
+
+    /* New items continue after the highest loaded id. */
+    ASSERT(eb_bm_add(&loaded, "New", "https://new.example/", 1) == other + 1);
+    eb_bm_destroy(&bm);
+    eb_bm_destroy(&loaded);
+}
+
 int main(void) {
     printf("=== Bookmark Tests ===\n");
     RUN(test_init); RUN(test_add_bookmark); RUN(test_add_folder);
     RUN(test_remove_bookmark); RUN(test_update_bookmark);
     RUN(test_exists_url); RUN(test_search); RUN(test_get_children);
     RUN(test_tags); RUN(test_move); RUN(test_get_nonexistent);
+    RUN(test_save_load_round_trip);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }
