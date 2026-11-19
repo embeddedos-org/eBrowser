@@ -26,7 +26,17 @@ static bool find_attr(const char *ts, const char *te, const char *name, char *ou
     size_t nlen = strlen(name);
     const char *p = ts;
     while (p + nlen < te) {
-        if (strncasecmp(p, name, nlen) == 0 && (p[nlen] == '=' || isspace((unsigned char)p[nlen]))) {
+        /* Skip quoted attribute values, and only match a name that starts
+         * an attribute, so "x" does not match the end of "rx" and "d" does
+         * not match the end of "id". */
+        if (*p == '"' || *p == '\'') {
+            char q = *p++;
+            while (p < te && *p != q) p++;
+            if (p < te) p++;
+            continue;
+        }
+        bool at_start = (p == ts) || isspace((unsigned char)p[-1]);
+        if (at_start && strncasecmp(p, name, nlen) == 0 && (p[nlen] == '=' || isspace((unsigned char)p[nlen]))) {
             p += nlen;
             while (p < te && isspace((unsigned char)*p)) p++;
             if (p < te && *p == '=') {
