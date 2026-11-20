@@ -22,6 +22,7 @@
 //
 #include "eBrowser/compat.h"
 #include "eBrowser/browser.h"
+#include "eBrowser/logger.h"
 #include "eBrowser/html_parser.h"
 #include "eBrowser/css_parser.h"
 #include "eBrowser/layout.h"
@@ -85,7 +86,7 @@ static void show_engine_fallback_page(eb_browser_t *b, const char *url, const ch
 static void close_menu_panel(eb_browser_t *b);
 static void open_menu_panel(eb_browser_t *b);
 static const char *bookmarks_path(void);
-static void persist_bookmarks(eb_browser_t *b);
+static bool persist_bookmarks(eb_browser_t *b);
 static void rebuild_bookmarks_bar(eb_browser_t *b);
 
 /* ===== Path helpers ===== */
@@ -562,9 +563,13 @@ void eb_browser_toggle_bookmarks_bar(eb_browser_t *b) {
     eb_settings_set_bool("appearance.show_bookmarks_bar", b->bookmarks_bar_visible);
 }
 
-static void persist_bookmarks(eb_browser_t *b) {
-    if (!b) return;
-    eb_bm_save(&b->bookmarks, bookmarks_path());
+static bool persist_bookmarks(eb_browser_t *b) {
+    if (!b) return false;
+    if (eb_bm_save(&b->bookmarks, bookmarks_path()) < 0) {
+        EB_LOG_E("browser", "failed to save bookmarks");
+        return false;
+    }
+    return true;
 }
 
 static void update_star_button(eb_browser_t *b) {
@@ -600,14 +605,16 @@ void eb_browser_toggle_bookmark_current(eb_browser_t *b) {
             existing = b->bookmarks.items[i].id; break;
         }
     }
+    bool added = existing < 0;
     if (existing >= 0) {
         eb_bm_remove(&b->bookmarks, existing);
-        eb_browser_set_status(b, "Bookmark removed");
     } else {
         eb_bm_add(&b->bookmarks, b->tabs[b->active_tab].title, url, bar_id);
-        eb_browser_set_status(b, "Bookmark added");
     }
-    persist_bookmarks(b);
+    if (persist_bookmarks(b))
+        eb_browser_set_status(b, added ? "Bookmark added" : "Bookmark removed");
+    else
+        eb_browser_set_status(b, "Bookmark not saved - bookmarks file is damaged");
     rebuild_bookmarks_bar(b);
     update_star_button(b);
 }
@@ -909,8 +916,12 @@ bool eb_browser_init(eb_browser_t *browser, lv_obj_t *parent) {
     eb_priv_init(&browser->privacy);
     eb_settings_init();
 
-    /* Load persisted bookmarks if any. */
-    eb_bm_load(&browser->bookmarks, bookmarks_path());
+    /* Load persisted bookmarks if any. A damaged file must stay visible
+     * and must never be overwritten by the partial load (#67). */
+    int bm_loaded = eb_bm_load(&browser->bookmarks, bookmarks_path());
+    if (bm_loaded == -2)
+        EB_LOG_W("browser", "bookmarks file is damaged (%d bad line(s)); original file kept",
+                 browser->bookmarks.load_errors);
     browser->bookmarks_bar_visible =
         eb_settings_get_bool("appearance.show_bookmarks_bar", true);
 
@@ -1055,6 +1066,8 @@ bool eb_browser_init(eb_browser_t *browser, lv_obj_t *parent) {
 
     browser->status_label = lv_label_create(browser->status_bar);
     lv_label_set_text(browser->status_label, "Ready");
+    if (browser->bookmarks.load_errors > 0)
+        eb_browser_set_status(browser, "Bookmarks file is damaged - original kept, new bookmarks will not be saved");
     lv_obj_set_style_text_font(browser->status_label, &lv_font_montserrat_12, LV_PART_MAIN);
     lv_obj_set_style_text_color(browser->status_label, EB_COL_TEXT_MUTED, LV_PART_MAIN);
     lv_obj_align(browser->status_label, LV_ALIGN_LEFT_MID, 0, 0);

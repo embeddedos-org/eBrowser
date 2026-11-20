@@ -19,7 +19,12 @@ typedef struct {
     uint64_t created_at, last_visited; int visit_count;
 } eb_bookmark_t;
 
-typedef struct { eb_bookmark_t items[EB_BM_MAX_ITEMS]; int count, next_id; char file_path[512]; } eb_bookmark_mgr_t;
+/* The manager remembers how the last load went: the number of lines
+ * eb_bm_load() had to skip. 0 means the last load was clean (or no load
+ * has run yet); > 0 means the manager was loaded from a damaged file and
+ * eb_bm_save() will refuse to persist it, so a partial load can never
+ * overwrite the original file (#67). A later clean load clears it. */
+typedef struct { eb_bookmark_t items[EB_BM_MAX_ITEMS]; int count, next_id; char file_path[512]; int load_errors; } eb_bookmark_mgr_t;
 
 void  eb_bm_init(eb_bookmark_mgr_t *bm);
 void  eb_bm_destroy(eb_bookmark_mgr_t *bm);
@@ -33,7 +38,25 @@ bool  eb_bm_exists_url(const eb_bookmark_mgr_t *bm, const char *url);
 int   eb_bm_search(const eb_bookmark_mgr_t *bm, const char *query, int *results, int max);
 int   eb_bm_get_children(const eb_bookmark_mgr_t *bm, int parent_id, int *results, int max);
 bool  eb_bm_add_tag(eb_bookmark_mgr_t *bm, int id, const char *tag);
+/* Persist the manager atomically (write to "<path>.tmp", move the current
+ * file aside as "<path>.bak", rename the new copy into place), so a crash
+ * can never leave a half-written bookmarks file behind.
+ * Returns the number of bookmarks written, or -1 on error. Also returns
+ * -1, without touching the file, when the manager was loaded with errors
+ * (bm->load_errors > 0): a partial load must never overwrite the
+ * original file (#67). */
 int   eb_bm_save(const eb_bookmark_mgr_t *bm, const char *path);
+/* Load bookmarks from a file.
+ * Returns the number of records read on a clean load (>= 0), -1 when the
+ * file cannot be opened (neither the file nor its "<path>.bak" backup),
+ * or -2 when the file is malformed: the load is partial, the good records
+ * are kept, the bad lines are skipped and counted in bm->load_errors, and
+ * the manager must not be saved back over the file (see eb_bm_save()).
+ * A malformed line is one that does not parse, has an out-of-range id,
+ * repeats an id already seen in the file, is cut short without a trailing
+ * newline (truncated file), or follows a missing/bad header. A line whose
+ * id is already in the manager (the root folders eb_bm_init() created) is
+ * skipped, not an error. */
 int   eb_bm_load(eb_bookmark_mgr_t *bm, const char *path);
 int   eb_bm_export_html(const eb_bookmark_mgr_t *bm, const char *path);
 int   eb_bm_import_html(eb_bookmark_mgr_t *bm, const char *path);
