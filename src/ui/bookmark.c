@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "eBrowser/bookmark.h"
 #include "eBrowser/compat.h"
+#include "eBrowser/logger.h"
+#include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -95,31 +98,155 @@ bool eb_bm_add_tag(eb_bookmark_mgr_t *bm, int id, const char *tag) {
     strncpy(b->tags[b->tag_count++], tag, EB_BM_TAG_LEN-1); return true;
 }
 
+/* Strip a trailing CR/LF from a line read with fgets(). */
+static char *strip_newline(char *s) {
+    size_t len = strlen(s);
+    while (len > 0 && (s[len - 1] == '\n' || s[len - 1] == '\r')) s[--len] = '\0';
+    return s;
+}
+
+/* Parse the "id|type|" prefix of a bookmarks file line. Only the id and
+ * type are read here (title/url/parent_id are PR #66's parse); a line is
+ * loadable when this prefix parses with checked conversions. Rejects
+ * ids that cannot be stored (<= 0, or INT_MAX, whose successor would
+ * overflow next_id) and types outside the eb_bm_type_t range. */
+static bool parse_bm_prefix(const char *line, int *id_out, eb_bm_type_t *type_out) {
+    char *end = NULL;
+    errno = 0;
+    long id = strtol(line, &end, 10);
+    if (errno != 0 || end == line || *end != '|') return false;
+    if (id < 1 || id > INT_MAX - 1) return false; /* INT_MAX would overflow next_id */
+    const char *type_start = end + 1;
+    errno = 0;
+    long type = strtol(type_start, &end, 10);
+    if (errno != 0 || end == type_start || *end != '|') return false;
+    if (type < EB_BM_BOOKMARK || type > EB_BM_SEPARATOR) return false;
+    *id_out = (int)id;
+    *type_out = (eb_bm_type_t)type;
+    return true;
+}
+
 int eb_bm_save(const eb_bookmark_mgr_t *bm, const char *path) {
     if (!bm || !path) return -1;
-    FILE *f = fopen(path, "w"); if (!f) return -1;
-    fprintf(f, "eBrowser Bookmarks v1\n");
-    for (int i = 0; i < bm->count; i++) {
-        const eb_bookmark_t *b = &bm->items[i];
-        fprintf(f, "%d|%d|%s|%s|%d\n", b->id, b->type, b->title, b->url, b->parent_id);
+    if (bm->load_errors > 0) {
+        /* The manager was loaded from a damaged file; persisting it would
+         * overwrite the original with a partial copy (#67). Refuse until a
+         * clean load clears the flag. */
+        EB_LOG_E("bookmark", "refusing to save bookmarks: manager was loaded with %d bad line(s); original file '%s' preserved",
+                 bm->load_errors, path);
+        return -1;
     }
-    fclose(f); return bm->count;
+    char tmp[1024], bak[1024];
+    if (snprintf(tmp, sizeof(tmp), "%s.tmp", path) >= (int)sizeof(tmp) ||
+        snprintf(bak, sizeof(bak), "%s.bak", path) >= (int)sizeof(bak)) return -1;
+    FILE *f = fopen(tmp, "w");
+    if (!f) return -1;
+    bool ok = true;
+    if (fprintf(f, "eBrowser Bookmarks v1\n") < 0) ok = false;
+    for (int i = 0; ok && i < bm->count; i++) {
+        const eb_bookmark_t *b = &bm->items[i];
+        if (fprintf(f, "%d|%d|%s|%s|%d\n", b->id, b->type, b->title, b->url, b->parent_id) < 0) ok = false;
+    }
+    if (fclose(f) != 0) ok = false;
+    if (!ok) { remove(tmp); return -1; }
+    /* Move the current file aside as the last-good backup, then install the
+     * new copy. Both steps are renames, so a crash can never leave a
+     * half-written bookmarks file behind, and on Windows the install works
+     * because the destination no longer exists at rename time. */
+    if (rename(path, bak) != 0 && errno != ENOENT) { remove(tmp); return -1; }
+    if (rename(tmp, path) != 0) {
+        EB_LOG_E("bookmark", "failed to install new bookmarks file '%s'; original kept as '%s'", path, bak);
+        rename(bak, path); /* best effort: put the original back */
+        remove(tmp);
+        return -1;
+    }
+    return bm->count;
 }
 
 int eb_bm_load(eb_bookmark_mgr_t *bm, const char *path) {
     if (!bm || !path) return -1;
-    FILE *f = fopen(path, "r"); if (!f) return -1;
-    char line[4096]; int n = 0;
-    fgets(line, sizeof(line), f); /* skip header */
-    while (fgets(line, sizeof(line), f) && bm->count < EB_BM_MAX_ITEMS) {
+    FILE *f = fopen(path, "r");
+    if (!f) {
+        /* The main file may be missing because a previous save died between
+         * moving it aside and installing the new copy; the last-good backup
+         * still holds the bookmarks. */
+        char bak[1024];
+        if (snprintf(bak, sizeof(bak), "%s.bak", path) < (int)sizeof(bak)) {
+            f = fopen(bak, "r");
+            if (f) EB_LOG_W("bookmark", "bookmarks file '%s' missing; restored from backup '%s'", path, bak);
+        }
+        if (!f) return -1;
+    }
+    bm->load_errors = 0;
+    char line[4096];
+    int n = 0, errors = 0;
+    /* The header identifies the file; a file without it is not a bookmarks
+     * file (e.g. truncated to zero bytes) and nothing is loaded from it. */
+    if (!fgets(line, sizeof(line), f) || strcmp(strip_newline(line), "eBrowser Bookmarks v1") != 0) {
+        fclose(f);
+        bm->load_errors = 1;
+        EB_LOG_E("bookmark", "bookmarks file '%s' has a missing or bad header; keeping in-memory bookmarks", path);
+        return -2;
+    }
+    /* Ids already read from this file. A second occurrence is corruption
+     * (the #65 saver wrote duplicate root lines); it is skipped, never
+     * allowed to replace the good record (#67, and the #66 hold note). */
+    int seen[EB_BM_MAX_ITEMS]; int seen_count = 0;
+    int lineno = 1;
+    while (fgets(line, sizeof(line), f)) {
+        lineno++;
+        size_t len = strlen(line);
+        bool truncated = len > 0 && line[len - 1] != '\n';
+        int id; eb_bm_type_t type;
+        if (truncated || !parse_bm_prefix(line, &id, &type)) {
+            errors++;
+            EB_LOG_W("bookmark", "skipping malformed bookmarks line %d in '%s'%s",
+                     lineno, path, truncated ? " (truncated file)" : "");
+            continue;
+        }
+        bool dup = false;
+        for (int i = 0; i < seen_count; i++) if (seen[i] == id) { dup = true; break; }
+        if (dup) {
+            errors++;
+            EB_LOG_W("bookmark", "skipping duplicate bookmarks id %d (line %d) in '%s'", id, lineno, path);
+            continue;
+        }
+        /* The seen-set is capped at EB_BM_MAX_ITEMS: a file with more
+         * well-formed lines than the manager can hold errors out on the
+         * capacity check below anyway, so nothing is lost. */
+        if (seen_count < EB_BM_MAX_ITEMS) seen[seen_count++] = id;
+        /* An id already in the manager is one of the root folders
+         * eb_bm_init() created; the file's copy of it carries no new data
+         * (titles are loaded by #66), so keep the in-memory record. */
+        if (find_bm(bm, id)) {
+            n++;
+            if (id >= bm->next_id) bm->next_id = id + 1;
+            continue;
+        }
+        if (bm->count >= EB_BM_MAX_ITEMS) {
+            errors++;
+            EB_LOG_W("bookmark", "bookmarks file '%s' exceeds %d items; skipping id %d (line %d)",
+                     path, EB_BM_MAX_ITEMS, id, lineno);
+            continue;
+        }
         eb_bookmark_t *b = &bm->items[bm->count];
         memset(b, 0, sizeof(*b));
-        if (sscanf(line, "%d|%d|", &b->id, (int*)&b->type) == 2) {
-            bm->count++; n++;
-            if (b->id >= bm->next_id) bm->next_id = b->id + 1;
-        }
+        b->id = id; b->type = type;
+        bm->count++; n++;
+        if (id >= bm->next_id) bm->next_id = id + 1;
     }
-    fclose(f); return n;
+    if (ferror(f)) {
+        errors++;
+        EB_LOG_E("bookmark", "error while reading bookmarks file '%s'", path);
+    }
+    fclose(f);
+    bm->load_errors = errors;
+    if (errors > 0) {
+        EB_LOG_W("bookmark", "bookmarks file '%s' loaded with %d bad line(s); %d record(s) kept, original file preserved",
+                 path, errors, n);
+        return -2;
+    }
+    return n;
 }
 
 int eb_bm_export_html(const eb_bookmark_mgr_t *bm, const char *path) {
