@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Bookmarks: a malformed bookmarks file can no longer silently lose bookmarks (#67)**
+  - `eb_bm_load()` now reports a partial load (returns `-2`, with the bad lines counted in
+    `load_errors`) instead of silently skipping records, and the browser logs the damage
+    and shows it in the status bar.
+  - `eb_bm_save()` refuses to persist a manager loaded with errors, so a partial load can
+    never overwrite the original file; a later clean load clears the flag.
+  - Saves are atomic (write to `<path>.tmp`, move the current file aside as the last-good
+    `<path>.bak` backup, rename the new copy into place), and a missing bookmarks file is
+    restored from that backup on load.
+  - Duplicate ids in the file are rejected (the #65 corruption signature: a blank duplicate
+    line can no longer replace a complete record), and out-of-range ids are rejected with
+    checked conversions instead of overflowing `next_id`.
+
 ## [3.0.1] - 2026-05-16
 
 ### Production Release — Unified EmbeddedOS-org v3.0.1
