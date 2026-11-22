@@ -407,6 +407,54 @@ TEST(test_resolve_border) {
     ASSERT(s.border_color.r == 255);
 }
 
+// --- Invalid and shorthand color values ---
+
+TEST(test_resolve_background_none_is_transparent) {
+    const char *css = "div { background: none; }";
+    eb_stylesheet_t ss;
+    eb_css_init_stylesheet(&ss);
+    eb_css_parse(&ss, css, strlen(css));
+    eb_computed_style_t s = eb_css_resolve_style(&ss, "div", NULL, NULL);
+    ASSERT(s.background_color.a == 0);
+}
+
+TEST(test_resolve_background_shorthand_color) {
+    const char *css =
+        "div { background: #f8f9fa url(bg.png) no-repeat; }"
+        "p { background: url(bg.png) no-repeat rgb(10, 20, 30); }"
+        "nav { background: navy; }";
+    eb_stylesheet_t ss;
+    eb_css_init_stylesheet(&ss);
+    eb_css_parse(&ss, css, strlen(css));
+    eb_computed_style_t s = eb_css_resolve_style(&ss, "div", NULL, NULL);
+    ASSERT(s.background_color.r == 0xf8 && s.background_color.g == 0xf9 && s.background_color.b == 0xfa);
+    ASSERT(s.background_color.a == 255);
+    s = eb_css_resolve_style(&ss, "p", NULL, NULL);
+    ASSERT(s.background_color.r == 10 && s.background_color.g == 20 && s.background_color.b == 30);
+    ASSERT(s.background_color.a == 255);
+    s = eb_css_resolve_style(&ss, "nav", NULL, NULL);
+    ASSERT(s.background_color.r == 0 && s.background_color.g == 0 && s.background_color.b == 128);
+}
+
+TEST(test_resolve_unknown_color_value_is_ignored) {
+    const char *css =
+        "div { background-color: yellow; border-color: blue; color: green; }"
+        ".x { background-color: rgba(0, 0, 0, 0.5); border-color: hsl(0, 100%, 50%); color: hsla(0, 100%, 50%, 0.5); }";
+    eb_stylesheet_t ss;
+    eb_css_init_stylesheet(&ss);
+    eb_css_parse(&ss, css, strlen(css));
+    eb_computed_style_t s = eb_css_resolve_style(&ss, "div", NULL, "x");
+    ASSERT(s.background_color.r == 255 && s.background_color.g == 255 && s.background_color.b == 0);
+    ASSERT(s.border_color.r == 0 && s.border_color.g == 0 && s.border_color.b == 255);
+    ASSERT(s.color.r == 0 && s.color.g == 128 && s.color.b == 0);
+}
+
+TEST(test_inline_unknown_color_value_is_ignored) {
+    eb_computed_style_t s = eb_css_default_style("span");
+    eb_css_apply_inline_style(&s, "color: green; color: hsl(0, 100%, 50%)");
+    ASSERT(s.color.r == 0 && s.color.g == 128 && s.color.b == 0);
+}
+
 int main(void) {
     printf("=== CSS Parser Tests ===\n");
     RUN(test_hex_6digit);
@@ -454,6 +502,10 @@ int main(void) {
     RUN(test_resolve_text_decoration);
     RUN(test_resolve_font_weight_numeric);
     RUN(test_resolve_border);
+    RUN(test_resolve_background_none_is_transparent);
+    RUN(test_resolve_background_shorthand_color);
+    RUN(test_resolve_unknown_color_value_is_ignored);
+    RUN(test_inline_unknown_color_value_is_ignored);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }
