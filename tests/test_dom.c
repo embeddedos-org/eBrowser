@@ -288,6 +288,54 @@ TEST(test_mixed_content_tree) {
     eb_dom_destroy(doc);
 }
 
+// --- Inner Text ---
+
+static char s_big[16384];
+
+static eb_dom_node_t *make_para(char fill, size_t len) {
+    char text[EB_DOM_MAX_TEXT_LEN];
+    memset(text, fill, len);
+    text[len] = '\0';
+    eb_dom_node_t *p = eb_dom_create_element("p");
+    eb_dom_append_child(p, eb_dom_create_text(text));
+    return p;
+}
+
+TEST(test_inner_text_nested_longer_than_text_node) {
+    /* <article><div><p>2000 x a</p><p>2000 x b</p><p>2000 x c</p></div></article> */
+    eb_dom_node_t *article = eb_dom_create_element("article");
+    eb_dom_node_t *div = eb_dom_create_element("div");
+    eb_dom_append_child(article, div);
+    eb_dom_append_child(div, make_para('a', 2000));
+    eb_dom_append_child(div, make_para('b', 2000));
+    eb_dom_append_child(div, make_para('c', 2000));
+    const char *r = eb_dom_get_inner_text(article, s_big, sizeof(s_big));
+    ASSERT(r == s_big);
+    ASSERT(strlen(s_big) == 6000);
+    ASSERT(s_big[0] == 'a' && s_big[1999] == 'a');
+    ASSERT(s_big[2000] == 'b' && s_big[3999] == 'b');
+    ASSERT(s_big[4000] == 'c' && s_big[5999] == 'c');
+    eb_dom_destroy(article);
+}
+
+TEST(test_inner_text_nested_truncates_to_buffer) {
+    /* <div>xy<span>hello</span>z</div> into a 6-byte buffer */
+    eb_dom_node_t *div = eb_dom_create_element("div");
+    eb_dom_node_t *span = eb_dom_create_element("span");
+    eb_dom_append_child(div, eb_dom_create_text("xy"));
+    eb_dom_append_child(div, span);
+    eb_dom_append_child(span, eb_dom_create_text("hello"));
+    eb_dom_append_child(div, eb_dom_create_text("z"));
+    char buf[32];
+    eb_dom_get_inner_text(div, buf, sizeof(buf));
+    ASSERT(strcmp(buf, "xyhelloz") == 0);
+    memset(buf, '#', sizeof(buf));
+    eb_dom_get_inner_text(div, buf, 6);
+    ASSERT(strcmp(buf, "xyhel") == 0);
+    ASSERT(buf[6] == '#');
+    eb_dom_destroy(div);
+}
+
 int main(void) {
     printf("=== DOM Tests ===\n");
     RUN(test_create_document);
@@ -319,6 +367,8 @@ int main(void) {
     RUN(test_find_by_id_deep);
     RUN(test_find_by_id_not_found);
     RUN(test_mixed_content_tree);
+    RUN(test_inner_text_nested_longer_than_text_node);
+    RUN(test_inner_text_nested_truncates_to_buffer);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }

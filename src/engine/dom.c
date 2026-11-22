@@ -282,27 +282,27 @@ bool eb_dom_set_inner_text(eb_dom_node_t *node, const char *text) {
     return true;
 }
 
-const char *eb_dom_get_inner_text(const eb_dom_node_t *node, char *buf, size_t buf_size) {
-    if (!node || !buf || buf_size == 0) return NULL;
-    buf[0] = '\0';
-    size_t pos = 0;
-
+/* Appends the text of node's descendants to buf, starting at pos, and returns
+ * the new end. Child elements write straight into buf, so the only limit on
+ * nested text is the caller's buf_size. */
+static size_t append_inner_text(const eb_dom_node_t *node, char *buf, size_t buf_size, size_t pos) {
     for (int i = 0; i < node->child_count && pos < buf_size - 1; i++) {
         const eb_dom_node_t *child = node->children[i];
         if (child->type == EB_NODE_TEXT) {
             size_t tlen = strlen(child->text);
-            if (pos + tlen >= buf_size - 1) tlen = buf_size - 1 - pos;
+            if (tlen > buf_size - 1 - pos) tlen = buf_size - 1 - pos;
             memcpy(buf + pos, child->text, tlen);
             pos += tlen;
         } else if (child->type == EB_NODE_ELEMENT) {
-            char sub[EB_DOM_MAX_TEXT_LEN];
-            eb_dom_get_inner_text(child, sub, sizeof(sub));
-            size_t slen = strlen(sub);
-            if (pos + slen >= buf_size - 1) slen = buf_size - 1 - pos;
-            memcpy(buf + pos, sub, slen);
-            pos += slen;
+            pos = append_inner_text(child, buf, buf_size, pos);
         }
     }
+    return pos;
+}
+
+const char *eb_dom_get_inner_text(const eb_dom_node_t *node, char *buf, size_t buf_size) {
+    if (!node || !buf || buf_size == 0) return NULL;
+    size_t pos = append_inner_text(node, buf, buf_size, 0);
     buf[pos] = '\0';
     return buf;
 }
