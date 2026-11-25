@@ -140,6 +140,57 @@ TEST(test_get_nonexistent) {
     eb_bm_destroy(&bm);
 }
 
+/* The browser runs eb_bm_init() and then eb_bm_load() on every start, so a
+ * save followed by that sequence must give back the same bookmarks. */
+TEST(test_save_load_round_trip) {
+    static eb_bookmark_mgr_t bm, loaded;
+    const char *path = "test_bookmark_round_trip.txt";
+    eb_bm_init(&bm);
+    int work = eb_bm_add_folder(&bm, "Work", 1);
+    int ex = eb_bm_add(&bm, "Example", "https://example.com/a?b=c", 1);
+    int docs = eb_bm_add(&bm, "Docs | Reference", "https://docs.example.org/", work);
+    int other = eb_bm_add(&bm, "Other", "https://other.example/", 2);
+    ASSERT(eb_bm_save(&bm, path) == bm.count);
+
+    eb_bm_init(&loaded);
+    ASSERT(eb_bm_load(&loaded, path) == bm.count);
+    remove(path);
+    ASSERT(loaded.count == bm.count);   /* no second copy of the root folders */
+
+    eb_bookmark_t *b = eb_bm_get(&loaded, ex);
+    ASSERT(b != NULL);
+    ASSERT(b->type == EB_BM_BOOKMARK);
+    ASSERT(strcmp(b->title, "Example") == 0);
+    ASSERT(strcmp(b->url, "https://example.com/a?b=c") == 0);
+    ASSERT(b->parent_id == 1);
+
+    b = eb_bm_get(&loaded, docs);
+    ASSERT(b != NULL);
+    ASSERT(strcmp(b->title, "Docs | Reference") == 0);
+    ASSERT(strcmp(b->url, "https://docs.example.org/") == 0);
+    ASSERT(b->parent_id == work);
+
+    b = eb_bm_get(&loaded, work);
+    ASSERT(b != NULL);
+    ASSERT(b->type == EB_BM_FOLDER);
+    ASSERT(strcmp(b->title, "Work") == 0);
+    ASSERT(b->url[0] == '\0');
+    ASSERT(b->parent_id == 1);
+
+    b = eb_bm_get(&loaded, other);
+    ASSERT(b != NULL && b->parent_id == 2);
+    ASSERT(strcmp(eb_bm_get(&loaded, 1)->title, "Bookmarks Bar") == 0);
+    ASSERT(eb_bm_exists_url(&loaded, "https://example.com/a?b=c"));
+
+    int kids[8];
+    ASSERT(eb_bm_get_children(&loaded, 1, kids, 8) == 2); /* Work, Example */
+
+    /* New items continue after the highest loaded id. */
+    ASSERT(eb_bm_add(&loaded, "New", "https://new.example/", 1) == other + 1);
+    eb_bm_destroy(&bm);
+    eb_bm_destroy(&loaded);
+}
+
 /* --- Malformed-file fixtures (#67): a partial load must never be saved
  * over the original file. Each test writes a fixture, loads it the way
  * the browser does (init, then load), and proves the file survives. --- */
@@ -352,15 +403,14 @@ TEST(test_load_restores_from_backup) {
     ASSERT(bm.load_errors == 0);
     ASSERT(bm.count == 3);
     ASSERT(eb_bm_get(&bm, 3) != NULL);
-    /* Saving now recreates the main file. The loaded record keeps its id
-     * and type; title/url/parent restore is #66's scope, so the saved
-     * line for id 3 carries empty fields until that lands. */
+    /* Saving now recreates the main file. Since #66 the load reads the
+     * title, url and parent_id too, so the restored file is identical to
+     * the backup it came from. */
+    ASSERT(strcmp(eb_bm_get(&bm, 3)->title, "Kept") == 0);
+    ASSERT(strcmp(eb_bm_get(&bm, 3)->url, "https://kept.com") == 0);
+    ASSERT(eb_bm_get(&bm, 3)->parent_id == 1);
     ASSERT(eb_bm_save(&bm, path) == 3);
-    ASSERT(file_equals(path,
-        "eBrowser Bookmarks v1\n"
-        "1|1|Bookmarks Bar||0\n"
-        "2|1|Other Bookmarks||0\n"
-        "3|0|||0\n"));
+    ASSERT(file_equals(path, content));
     remove(path); remove(bak);
     eb_bm_destroy(&bm);
 }
@@ -371,6 +421,7 @@ int main(void) {
     RUN(test_remove_bookmark); RUN(test_update_bookmark);
     RUN(test_exists_url); RUN(test_search); RUN(test_get_children);
     RUN(test_tags); RUN(test_move); RUN(test_get_nonexistent);
+    RUN(test_save_load_round_trip);
     RUN(test_load_bad_line_partial); RUN(test_load_truncated);
     RUN(test_load_duplicate_blank_record); RUN(test_load_bad_header);
     RUN(test_load_rejects_out_of_range_id); RUN(test_save_atomic_with_backup);

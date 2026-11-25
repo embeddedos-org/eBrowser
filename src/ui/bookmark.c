@@ -110,7 +110,10 @@ static char *strip_newline(char *s) {
  * loadable when this prefix parses with checked conversions. Rejects
  * ids that cannot be stored (<= 0, or INT_MAX, whose successor would
  * overflow next_id) and types outside the eb_bm_type_t range. */
-static bool parse_bm_prefix(const char *line, int *id_out, eb_bm_type_t *type_out) {
+/* @p rest_out, when given, receives the first character after the type's '|',
+ * so a caller can go on to read the title, url and parent_id. */
+static bool parse_bm_prefix(const char *line, int *id_out, eb_bm_type_t *type_out,
+                            const char **rest_out) {
     char *end = NULL;
     errno = 0;
     long id = strtol(line, &end, 10);
@@ -123,6 +126,7 @@ static bool parse_bm_prefix(const char *line, int *id_out, eb_bm_type_t *type_ou
     if (type < EB_BM_BOOKMARK || type > EB_BM_SEPARATOR) return false;
     *id_out = (int)id;
     *type_out = (eb_bm_type_t)type;
+    if (rest_out) *rest_out = end + 1;
     return true;
 }
 
@@ -163,6 +167,32 @@ int eb_bm_save(const eb_bookmark_mgr_t *bm, const char *path) {
     return bm->count;
 }
 
+/* Parse one "id|type|title|url|parent_id" line written by eb_bm_save().
+ * The title may contain '|', so id and type are taken from the left,
+ * parent_id from the right, and the url is what follows the last '|' in
+ * between (a '|' in a URL is normally percent-encoded). */
+static bool parse_bm_line(char *line, eb_bookmark_t *b) {
+    strip_newline(line);
+    /* id and type go through parse_bm_prefix, which also rejects an id
+     * outside 1..INT_MAX-1 and a strtol range error. */
+    const char *rest = NULL;
+    if (!parse_bm_prefix(line, &b->id, &b->type, &rest)) return false;
+    char *mid = line + (rest - line);
+    char *last = strrchr(mid, '|');
+    if (!last) return false;
+    *last = '\0';
+    char *end = NULL;
+    long pid = strtol(last + 1, &end, 10);
+    if (end == last + 1 || *end != '\0') return false;
+    b->parent_id = (int)pid;
+    char *sep = strrchr(mid, '|');
+    if (!sep) return false;
+    *sep = '\0';
+    strncpy(b->title, mid, EB_BM_TITLE_MAX-1);
+    strncpy(b->url, sep + 1, EB_BM_URL_MAX-1);
+    return true;
+}
+
 int eb_bm_load(eb_bookmark_mgr_t *bm, const char *path) {
     if (!bm || !path) return -1;
     FILE *f = fopen(path, "r");
@@ -197,13 +227,15 @@ int eb_bm_load(eb_bookmark_mgr_t *bm, const char *path) {
         lineno++;
         size_t len = strlen(line);
         bool truncated = len > 0 && line[len - 1] != '\n';
-        int id; eb_bm_type_t type;
-        if (truncated || !parse_bm_prefix(line, &id, &type)) {
+        eb_bookmark_t rec;
+        memset(&rec, 0, sizeof(rec));
+        if (truncated || !parse_bm_line(line, &rec)) {
             errors++;
             EB_LOG_W("bookmark", "skipping malformed bookmarks line %d in '%s'%s",
                      lineno, path, truncated ? " (truncated file)" : "");
             continue;
         }
+        const int id = rec.id;
         bool dup = false;
         for (int i = 0; i < seen_count; i++) if (seen[i] == id) { dup = true; break; }
         if (dup) {
@@ -216,23 +248,22 @@ int eb_bm_load(eb_bookmark_mgr_t *bm, const char *path) {
          * capacity check below anyway, so nothing is lost. */
         if (seen_count < EB_BM_MAX_ITEMS) seen[seen_count++] = id;
         /* An id already in the manager is one of the root folders
-         * eb_bm_init() created; the file's copy of it carries no new data
-         * (titles are loaded by #66), so keep the in-memory record. */
-        if (find_bm(bm, id)) {
-            n++;
-            if (id >= bm->next_id) bm->next_id = id + 1;
-            continue;
+         * eb_bm_init() created. The saved line now carries the title, url
+         * and parent_id, so it replaces that placeholder rather than being
+         * appended a second time. A repeat of the id later in the same file
+         * is still corruption and was skipped by the duplicate check above. */
+        eb_bookmark_t *b = find_bm(bm, id);
+        if (!b) {
+            if (bm->count >= EB_BM_MAX_ITEMS) {
+                errors++;
+                EB_LOG_W("bookmark", "bookmarks file '%s' exceeds %d items; skipping id %d (line %d)",
+                         path, EB_BM_MAX_ITEMS, id, lineno);
+                continue;
+            }
+            b = &bm->items[bm->count++];
         }
-        if (bm->count >= EB_BM_MAX_ITEMS) {
-            errors++;
-            EB_LOG_W("bookmark", "bookmarks file '%s' exceeds %d items; skipping id %d (line %d)",
-                     path, EB_BM_MAX_ITEMS, id, lineno);
-            continue;
-        }
-        eb_bookmark_t *b = &bm->items[bm->count];
-        memset(b, 0, sizeof(*b));
-        b->id = id; b->type = type;
-        bm->count++; n++;
+        *b = rec;
+        n++;
         if (id >= bm->next_id) bm->next_id = id + 1;
     }
     if (ferror(f)) {
