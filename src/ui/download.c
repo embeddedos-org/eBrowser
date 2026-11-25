@@ -33,8 +33,17 @@ int eb_dl_start(eb_download_mgr_t *dm, const char *url, const char *fn) {
     strncpy(d->url, url, EB_DL_URL_MAX-1);
     if (fn) strncpy(d->filename, fn, EB_DL_NAME_MAX-1);
     else {
-        const char *last = strrchr(url, '/');
-        if (last && *(last+1)) strncpy(d->filename, last+1, EB_DL_NAME_MAX-1);
+        /* The name is the last path segment: the query and fragment are not
+         * part of the path, and a '/' inside them does not start a segment. */
+        size_t path_len = strcspn(url, "?#");
+        const char *last = NULL;
+        for (size_t i = 0; i < path_len; i++) if (url[i] == '/') last = url + i;
+        size_t name_len = last ? (size_t)(url + path_len - (last + 1)) : 0;
+        if (name_len > 0) {
+            if (name_len > EB_DL_NAME_MAX-1) name_len = EB_DL_NAME_MAX-1;
+            memcpy(d->filename, last+1, name_len);
+            d->filename[name_len] = '\0';
+        }
         else strcpy(d->filename, "download");
     }
     snprintf(d->save_path, EB_DL_PATH_MAX, "%s/%s", dm->default_dir, d->filename);

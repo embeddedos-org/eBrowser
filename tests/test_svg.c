@@ -122,6 +122,43 @@ TEST(test_svg_default_fill) {
     ASSERT(svg.shapes[0].fill.r == 0 && svg.shapes[0].fill.g == 0 && svg.shapes[0].fill.b == 0);
 }
 
+TEST(test_svg_attr_whole_names) {
+    /* An attribute is looked up by its whole name: "x" must not match the
+     * end of "rx", "width" the end of "stroke-width", or "d" the end of
+     * "id", whatever order the attributes come in. */
+    const char *s =
+        "<svg width=\"200\" height=\"100\">"
+        "<rect rx=\"5\" ry=\"6\" stroke-width=\"3\" x=\"10\" y=\"20\" width=\"50\" height=\"30\" stroke=\"black\"/>"
+        "<circle id=\"dot\" cx=\"40\" cy=\"45\" r=\"7\"/>"
+        "<path id=\"tri\" d=\"M10 20 L30 40 Z\"/>"
+        "</svg>";
+    eb_svg_element_t svg;
+    ASSERT(eb_svg_parse(&svg, s, strlen(s)));
+    ASSERT(svg.shape_count == 3);
+    ASSERT(svg.shapes[0].type == EB_SVG_RECT);
+    ASSERT(svg.shapes[0].data.rect.x == 10);
+    ASSERT(svg.shapes[0].data.rect.y == 20);
+    ASSERT(svg.shapes[0].data.rect.width == 50);
+    ASSERT(svg.shapes[0].data.rect.height == 30);
+    ASSERT(svg.shapes[0].data.rect.rx == 5);
+    ASSERT(svg.shapes[0].data.rect.ry == 6);
+    ASSERT(svg.shapes[0].stroke_width == 3);
+    ASSERT(svg.shapes[1].data.circle.r == 7);
+    ASSERT(svg.shapes[2].type == EB_SVG_PATH);
+    ASSERT(svg.shapes[2].data.path.count == 3);
+    ASSERT(svg.shapes[2].data.path.points[1].x == 30);
+    ASSERT(svg.shapes[2].data.path.points[1].y == 40);
+}
+
+TEST(test_svg_attr_name_inside_value) {
+    /* Text inside another attribute's quoted value is not an attribute. */
+    const char *s = "<svg><rect class=\"a x=99\" x=\"4\" width=\"8\" height=\"9\"/></svg>";
+    eb_svg_element_t svg;
+    ASSERT(eb_svg_parse(&svg, s, strlen(s)));
+    ASSERT(svg.shape_count == 1);
+    ASSERT(svg.shapes[0].data.rect.x == 4);
+}
+
 int main(void) {
     printf("=== SVG Parser Tests ===\n");
     RUN(test_svg_parse_null);
@@ -134,6 +171,8 @@ int main(void) {
     RUN(test_svg_parse_viewbox);
     RUN(test_svg_parse_multiple_shapes);
     RUN(test_svg_default_fill);
+    RUN(test_svg_attr_whole_names);
+    RUN(test_svg_attr_name_inside_value);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }

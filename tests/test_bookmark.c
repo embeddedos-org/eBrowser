@@ -191,6 +191,230 @@ TEST(test_save_load_round_trip) {
     eb_bm_destroy(&loaded);
 }
 
+/* --- Malformed-file fixtures (#67): a partial load must never be saved
+ * over the original file. Each test writes a fixture, loads it the way
+ * the browser does (init, then load), and proves the file survives. --- */
+
+static void write_fixture(const char *path, const char *content) {
+    FILE *f = fopen(path, "w");
+    ASSERT(f != NULL);
+    if (!f) return;
+    fputs(content, f);
+    fclose(f);
+}
+
+static bool file_equals(const char *path, const char *expected) {
+    FILE *f = fopen(path, "r");
+    if (!f) return false;
+    char buf[8192];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+    return strcmp(buf, expected) == 0;
+}
+
+TEST(test_load_bad_line_partial) {
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_bad_line.txt";
+    const char *fixture =
+        "eBrowser Bookmarks v1\n"
+        "3|0|Good|https://good.com|1\n"
+        "this line is not a bookmark\n"
+        "4|0|Also Good|https://alsogood.com|1\n";
+    write_fixture(path, fixture);
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == -2);
+    ASSERT(bm.load_errors == 1);
+    ASSERT(bm.count == 4); /* 2 roots + 2 good records */
+    ASSERT(eb_bm_get(&bm, 3) != NULL);
+    ASSERT(eb_bm_get(&bm, 4) != NULL);
+    ASSERT(bm.next_id == 5);
+    /* The partial load must never be persisted over the original. */
+    ASSERT(eb_bm_save(&bm, path) == -1);
+    ASSERT(file_equals(path, fixture));
+    remove(path);
+    eb_bm_destroy(&bm);
+}
+
+TEST(test_load_truncated) {
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_truncated.txt";
+    const char *fixture =
+        "eBrowser Bookmarks v1\n"
+        "3|0|Example|https://example.com|1\n"
+        "4|0|Cut|https://cut.examp"; /* no trailing newline: truncated */
+    write_fixture(path, fixture);
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == -2);
+    ASSERT(bm.load_errors == 1);
+    ASSERT(bm.count == 3); /* 2 roots + the one complete record */
+    ASSERT(eb_bm_get(&bm, 3) != NULL);
+    ASSERT(eb_bm_get(&bm, 4) == NULL); /* cut record is not loaded */
+    ASSERT(eb_bm_save(&bm, path) == -1);
+    ASSERT(file_equals(path, fixture));
+    remove(path);
+    eb_bm_destroy(&bm);
+}
+
+TEST(test_load_duplicate_blank_record) {
+    /* The #66 hold note: a file corrupted by #65 has the complete id-1
+     * line first and a blank id-1 line later. The blank duplicate must
+     * never replace the complete record, and the file must survive. */
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_duplicate.txt";
+    const char *fixture =
+        "eBrowser Bookmarks v1\n"
+        "1|1|Bookmarks Bar||0\n"
+        "1|1|||0\n"
+        "3|0|Example|https://example.com|1\n";
+    write_fixture(path, fixture);
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == -2);
+    ASSERT(bm.load_errors == 1);
+    ASSERT(bm.count == 3); /* 2 roots + the one good record, no duplicates */
+    eb_bookmark_t *bar = eb_bm_get(&bm, 1);
+    ASSERT(bar != NULL);
+    ASSERT(strcmp(bar->title, "Bookmarks Bar") == 0);
+    ASSERT(eb_bm_get(&bm, 3) != NULL);
+    ASSERT(eb_bm_save(&bm, path) == -1);
+    ASSERT(file_equals(path, fixture));
+    remove(path);
+    eb_bm_destroy(&bm);
+}
+
+TEST(test_load_bad_header) {
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_bad_header.txt";
+    const char *fixture =
+        "not a bookmarks file\n"
+        "3|0|X|https://x.com|1\n";
+    write_fixture(path, fixture);
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == -2);
+    ASSERT(bm.load_errors == 1);
+    ASSERT(bm.count == 2); /* init roots only; nothing loaded */
+    ASSERT(eb_bm_save(&bm, path) == -1);
+    ASSERT(file_equals(path, fixture));
+    remove(path);
+    eb_bm_destroy(&bm);
+}
+
+TEST(test_load_rejects_out_of_range_id) {
+    /* INT_MAX would overflow next_id (id + 1); negative ids are invalid. */
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_range.txt";
+    const char *fixture =
+        "eBrowser Bookmarks v1\n"
+        "2147483647|0|Big|https://big.com|1\n"
+        "-5|0|Neg|https://neg.com|1\n"
+        "3|0|Good|https://good.com|1\n";
+    write_fixture(path, fixture);
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == -2);
+    ASSERT(bm.load_errors == 2);
+    ASSERT(bm.count == 3);
+    ASSERT(eb_bm_get(&bm, 3) != NULL);
+    ASSERT(bm.next_id == 4);
+    ASSERT(eb_bm_save(&bm, path) == -1);
+    ASSERT(file_equals(path, fixture));
+    remove(path);
+    eb_bm_destroy(&bm);
+}
+
+TEST(test_save_atomic_with_backup) {
+    static eb_bookmark_mgr_t bm;
+    static eb_bookmark_mgr_t bm2;
+    const char *path = "test_bm_atomic.txt";
+    const char *bak = "test_bm_atomic.txt.bak";
+    const char *tmp = "test_bm_atomic.txt.tmp";
+    const char *first =
+        "eBrowser Bookmarks v1\n"
+        "1|1|Bookmarks Bar||0\n"
+        "2|1|Other Bookmarks||0\n"
+        "3|0|One|https://one.com|1\n";
+    const char *second =
+        "eBrowser Bookmarks v1\n"
+        "1|1|Bookmarks Bar||0\n"
+        "2|1|Other Bookmarks||0\n"
+        "3|0|One|https://one.com|1\n"
+        "4|0|Two|https://two.com|1\n";
+    remove(path); remove(bak); remove(tmp);
+    eb_bm_init(&bm);
+    eb_bm_add(&bm, "One", "https://one.com", 1);
+    ASSERT(eb_bm_save(&bm, path) == 3);
+    ASSERT(file_equals(path, first));
+    /* A second save keeps the previous file as the last-good backup. */
+    eb_bm_add(&bm, "Two", "https://two.com", 1);
+    ASSERT(eb_bm_save(&bm, path) == 4);
+    ASSERT(file_equals(path, second));
+    ASSERT(file_equals(bak, first));
+    /* No temp file is left behind. */
+    FILE *leftover = fopen(tmp, "r");
+    ASSERT(leftover == NULL);
+    /* A clean load may be saved again. */
+    eb_bm_init(&bm2);
+    ASSERT(eb_bm_load(&bm2, path) == 4);
+    ASSERT(bm2.load_errors == 0);
+    ASSERT(bm2.count == 4);
+    ASSERT(eb_bm_save(&bm2, path) == 4);
+    ASSERT(file_equals(bak, second));
+    remove(path); remove(bak); remove(tmp);
+    eb_bm_destroy(&bm);
+    eb_bm_destroy(&bm2);
+}
+
+TEST(test_load_over_capacity) {
+    /* More records than the manager holds: the extras are skipped, the
+     * load is partial, and the file is preserved. */
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_capacity.txt";
+    FILE *f = fopen(path, "w");
+    ASSERT(f != NULL);
+    if (!f) return;
+    fputs("eBrowser Bookmarks v1\n", f);
+    for (int i = 3; i < 3 + EB_BM_MAX_ITEMS + 5; i++)
+        fprintf(f, "%d|0|B%d|https://b%d.com|1\n", i, i, i);
+    fclose(f);
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == -2);
+    ASSERT(bm.load_errors == 7); /* 1029 lines, room for 1022 after the roots */
+    ASSERT(bm.count == EB_BM_MAX_ITEMS);
+    ASSERT(eb_bm_save(&bm, path) == -1);
+    remove(path);
+    eb_bm_destroy(&bm);
+}
+
+TEST(test_load_restores_from_backup) {
+    /* The main file may be missing after a save died between moving it
+     * aside and installing the new copy; the last-good backup still
+     * holds the bookmarks. */
+    static eb_bookmark_mgr_t bm;
+    const char *path = "test_bm_restore.txt";
+    const char *bak = "test_bm_restore.txt.bak";
+    const char *content =
+        "eBrowser Bookmarks v1\n"
+        "1|1|Bookmarks Bar||0\n"
+        "2|1|Other Bookmarks||0\n"
+        "3|0|Kept|https://kept.com|1\n";
+    remove(path); remove(bak);
+    write_fixture(bak, content); /* only the backup exists: main file lost */
+    eb_bm_init(&bm);
+    ASSERT(eb_bm_load(&bm, path) == 3);
+    ASSERT(bm.load_errors == 0);
+    ASSERT(bm.count == 3);
+    ASSERT(eb_bm_get(&bm, 3) != NULL);
+    /* Saving now recreates the main file. Since #66 the load reads the
+     * title, url and parent_id too, so the restored file is identical to
+     * the backup it came from. */
+    ASSERT(strcmp(eb_bm_get(&bm, 3)->title, "Kept") == 0);
+    ASSERT(strcmp(eb_bm_get(&bm, 3)->url, "https://kept.com") == 0);
+    ASSERT(eb_bm_get(&bm, 3)->parent_id == 1);
+    ASSERT(eb_bm_save(&bm, path) == 3);
+    ASSERT(file_equals(path, content));
+    remove(path); remove(bak);
+    eb_bm_destroy(&bm);
+}
+
 int main(void) {
     printf("=== Bookmark Tests ===\n");
     RUN(test_init); RUN(test_add_bookmark); RUN(test_add_folder);
@@ -198,6 +422,10 @@ int main(void) {
     RUN(test_exists_url); RUN(test_search); RUN(test_get_children);
     RUN(test_tags); RUN(test_move); RUN(test_get_nonexistent);
     RUN(test_save_load_round_trip);
+    RUN(test_load_bad_line_partial); RUN(test_load_truncated);
+    RUN(test_load_duplicate_blank_record); RUN(test_load_bad_header);
+    RUN(test_load_rejects_out_of_range_id); RUN(test_save_atomic_with_backup);
+    RUN(test_load_restores_from_backup); RUN(test_load_over_capacity);
     printf("\nResults: %d passed, %d failed\n", s_pass, s_fail);
     return s_fail > 0 ? 1 : 0;
 }

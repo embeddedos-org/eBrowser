@@ -28,6 +28,12 @@ eb_cache_entry_t *eb_cache_get(eb_cache_t *cache, const char *url) {
     return NULL;
 }
 
+static eb_cache_entry_t *free_slot(eb_cache_t *cache) {
+    for (int i = 0; i < cache->entry_count; i++)
+        if (!cache->entries[i].valid) return &cache->entries[i];
+    return NULL;
+}
+
 bool eb_cache_put(eb_cache_t *cache, const char *url, const uint8_t *data, size_t len, const char *etag, int max_age_sec) {
     if (!cache || !url || !data || len == 0) return false;
     while (cache->current_size + len > cache->max_size_bytes && cache->entry_count > 0) eb_cache_evict_lru(cache);
@@ -40,9 +46,18 @@ bool eb_cache_put(eb_cache_t *cache, const char *url, const uint8_t *data, size_
         }
     }
     if (!entry) {
-        if (cache->entry_count >= EB_CACHE_MAX_ENTRIES) eb_cache_evict_lru(cache);
-        if (cache->entry_count >= EB_CACHE_MAX_ENTRIES) return false;
-        entry = &cache->entries[cache->entry_count++];
+        /* Reuse a slot freed by invalidation, expiry or eviction before
+         * growing the table; when every slot holds a live entry, evict the
+         * least recently used one and take its slot. */
+        entry = free_slot(cache);
+        if (!entry && cache->entry_count < EB_CACHE_MAX_ENTRIES)
+            entry = &cache->entries[cache->entry_count++];
+        if (!entry) {
+            eb_cache_evict_lru(cache);
+            entry = free_slot(cache);
+        }
+        if (!entry) return false;
+        memset(entry, 0, sizeof(*entry));
     }
     strncpy(entry->url, url, EB_CACHE_MAX_URL - 1);
     if (etag) strncpy(entry->etag, etag, EB_CACHE_MAX_ETAG - 1);

@@ -20,9 +20,11 @@ static void trim(char *s) {
     while (len > 0 && isspace((unsigned char)s[len - 1])) s[--len] = '\0';
 }
 
-eb_color_t eb_css_parse_color(const char *str) {
+/* Parses one CSS color value into *out. Returns false, and leaves *out
+ * unchanged, when str is not a color this parser understands. */
+static bool parse_color_value(const char *str, eb_color_t *out) {
     eb_color_t c = {0, 0, 0, 255};
-    if (!str) return c;
+    if (!str) return false;
     while (isspace((unsigned char)*str)) str++;
     if (*str == '#') {
         str++;
@@ -30,17 +32,21 @@ eb_color_t eb_css_parse_color(const char *str) {
         size_t len = 0;
         const char *p = str;
         while (isxdigit((unsigned char)*p)) { p++; len++; }
+        if (len != 6 && len != 3) return false;
         sscanf(str, "%x", &hex);
         if (len == 6) { c.r = (uint8_t)((hex >> 16) & 0xFF); c.g = (uint8_t)((hex >> 8) & 0xFF); c.b = (uint8_t)(hex & 0xFF); }
-        else if (len == 3) { c.r = (uint8_t)(((hex >> 8) & 0xF) * 17); c.g = (uint8_t)(((hex >> 4) & 0xF) * 17); c.b = (uint8_t)((hex & 0xF) * 17); }
-        return c;
+        else { c.r = (uint8_t)(((hex >> 8) & 0xF) * 17); c.g = (uint8_t)(((hex >> 4) & 0xF) * 17); c.b = (uint8_t)((hex & 0xF) * 17); }
+        *out = c;
+        return true;
     }
     if (strncasecmp(str, "rgb(", 4) == 0) {
         int r, g, b;
         if (sscanf(str, "rgb(%d,%d,%d)", &r, &g, &b) == 3 || sscanf(str, "rgb( %d , %d , %d )", &r, &g, &b) == 3) {
             c.r = (uint8_t)(r < 0 ? 0 : r > 255 ? 255 : r); c.g = (uint8_t)(g < 0 ? 0 : g > 255 ? 255 : g); c.b = (uint8_t)(b < 0 ? 0 : b > 255 ? 255 : b);
+            *out = c;
+            return true;
         }
-        return c;
+        return false;
     }
     struct { const char *name; uint8_t r, g, b; } named[] = {
         {"black",0,0,0},{"white",255,255,255},{"red",255,0,0},{"green",0,128,0},{"blue",0,0,255},{"yellow",255,255,0},
@@ -48,9 +54,39 @@ eb_color_t eb_css_parse_color(const char *str) {
         {"navy",0,0,128},{"teal",0,128,128},{"maroon",128,0,0},{"aqua",0,255,255},{"lime",0,255,0},{"transparent",0,0,0},{NULL,0,0,0}
     };
     for (int i = 0; named[i].name; i++) {
-        if (strcasecmp(str, named[i].name) == 0) { c.r = named[i].r; c.g = named[i].g; c.b = named[i].b; if (strcasecmp(str,"transparent")==0) c.a=0; return c; }
+        if (strcasecmp(str, named[i].name) == 0) { c.r = named[i].r; c.g = named[i].g; c.b = named[i].b; if (strcasecmp(str,"transparent")==0) c.a=0; *out = c; return true; }
     }
+    return false;
+}
+
+eb_color_t eb_css_parse_color(const char *str) {
+    eb_color_t c = {0, 0, 0, 255};
+    parse_color_value(str, &c);
     return c;
+}
+
+/* The background shorthand ("#fff url(a.png) no-repeat", "none") sets the
+ * background color from its color component, or to transparent when it has
+ * none. Words are split on spaces outside parentheses. */
+static eb_color_t background_shorthand_color(const char *value) {
+    eb_color_t none = {0, 0, 0, 0};
+    const char *p = value;
+    while (*p) {
+        while (*p && isspace((unsigned char)*p)) p++;
+        if (!*p) break;
+        char word[EB_CSS_MAX_VALUE] = {0};
+        size_t n = 0;
+        int depth = 0;
+        while (*p && (depth > 0 || !isspace((unsigned char)*p))) {
+            if (*p == '(') depth++;
+            else if (*p == ')' && depth > 0) depth--;
+            if (n < sizeof(word) - 1) word[n++] = *p;
+            p++;
+        }
+        eb_color_t c;
+        if (parse_color_value(word, &c)) return c;
+    }
+    return none;
 }
 
 int eb_css_parse_length(const char *str) { if (!str) return 0; while (isspace((unsigned char)*str)) str++; return atoi(str); }
@@ -114,8 +150,11 @@ eb_computed_style_t eb_css_default_style(const char *tag) {
 
 static void apply_property(eb_computed_style_t *s, const char *name, const char *value) {
     if (!s||!name||!value) return;
-    if (strcmp(name,"color")==0) s->color=eb_css_parse_color(value);
-    else if (strcmp(name,"background-color")==0||strcmp(name,"background")==0) s->background_color=eb_css_parse_color(value);
+    /* A color value this parser does not understand ("rgba(...)", "hsl(...)")
+     * leaves the property as it was, as CSS ignores an invalid declaration. */
+    if (strcmp(name,"color")==0) { eb_color_t c; if (parse_color_value(value,&c)) s->color=c; }
+    else if (strcmp(name,"background-color")==0) { eb_color_t c; if (parse_color_value(value,&c)) s->background_color=c; }
+    else if (strcmp(name,"background")==0) s->background_color=background_shorthand_color(value);
     else if (strcmp(name,"font-size")==0) s->font_size=eb_css_parse_length(value);
     else if (strcmp(name,"font-weight")==0) s->font_weight=(strcasecmp(value,"bold")==0||atoi(value)>=700)?EB_FONT_WEIGHT_BOLD:EB_FONT_WEIGHT_NORMAL;
     else if (strcmp(name,"font-style")==0) s->font_style=(strcasecmp(value,"italic")==0)?EB_FONT_STYLE_ITALIC:EB_FONT_STYLE_NORMAL;
@@ -171,7 +210,7 @@ static void apply_property(eb_computed_style_t *s, const char *name, const char 
     else if (strcmp(name,"width")==0) { if (strcasecmp(value,"auto")==0) s->width_auto=true; else { s->width=eb_css_parse_length(value); s->width_auto=false; } }
     else if (strcmp(name,"height")==0) { if (strcasecmp(value,"auto")==0) s->height_auto=true; else { s->height=eb_css_parse_length(value); s->height_auto=false; } }
     else if (strcmp(name,"border-width")==0) s->border_width=eb_css_parse_length(value);
-    else if (strcmp(name,"border-color")==0) s->border_color=eb_css_parse_color(value);
+    else if (strcmp(name,"border-color")==0) { eb_color_t c; if (parse_color_value(value,&c)) s->border_color=c; }
     else if (strcmp(name,"border-radius")==0) s->border_radius=eb_css_parse_length(value);
     else if (strcmp(name,"line-height")==0) s->line_height=eb_css_parse_length(value);
     else if (strcmp(name,"list-style")==0||strcmp(name,"list-style-type")==0) {
