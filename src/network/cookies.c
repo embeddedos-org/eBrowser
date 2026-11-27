@@ -30,7 +30,7 @@ bool eb_cookie_jar_parse_set_cookie(eb_cookie_jar_t *jar, const char *header, co
         if (strncasecmp(p, "Secure", 6) == 0) { c.secure = true; p += 6; }
         else if (strncasecmp(p, "HttpOnly", 8) == 0) { c.http_only = true; p += 8; }
         else if (strncasecmp(p, "Path=", 5) == 0) { p += 5; const char *e = strchr(p, ';'); size_t l = e ? (size_t)(e-p) : strlen(p); if (l >= EB_COOKIE_MAX_PATH) l = EB_COOKIE_MAX_PATH-1; memset(c.path,0,sizeof(c.path)); strncpy(c.path, p, l); p += l; }
-        else if (strncasecmp(p, "Domain=", 7) == 0) { p += 7; const char *e = strchr(p, ';'); size_t l = e ? (size_t)(e-p) : strlen(p); if (l >= EB_COOKIE_MAX_DOMAIN) l = EB_COOKIE_MAX_DOMAIN-1; strncpy(c.domain, p, l); p += l; }
+        else if (strncasecmp(p, "Domain=", 7) == 0) { p += 7; const char *e = strchr(p, ';'); size_t l = e ? (size_t)(e-p) : strlen(p); if (l >= EB_COOKIE_MAX_DOMAIN) l = EB_COOKIE_MAX_DOMAIN-1; memset(c.domain,0,sizeof(c.domain)); strncpy(c.domain, p, l); p += l; }
         else if (strncasecmp(p, "Max-Age=", 8) == 0) { p += 8; c.expires = (int64_t)time(NULL) + atoi(p); while (*p && *p != ';') p++; }
         else if (strncasecmp(p, "SameSite=", 9) == 0) { p += 9; const char *e = strchr(p, ';'); size_t l = e ? (size_t)(e-p) : strlen(p); if (l > 15) l = 15; strncpy(c.same_site, p, l); p += l; }
         else { while (*p && *p != ';') p++; }

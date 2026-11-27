@@ -204,6 +204,23 @@ class TestBrowserPipeline(unittest.TestCase):
         self.assertEqual(parts["session"], "abc123")
         self.assertIn("Secure", parts)
 
+    def test_cookie_domain_override_clears_old(self):
+        """Domain= attribute shorter than the initial domain must not
+        leave trailing bytes from the original.  Mirrors the fix in
+        cookies.c where memset(c.domain, ...) was added before
+        strncpy for the Domain= branch."""
+        MAX = 256
+        domain = bytearray(MAX)
+        # Initial domain from the function parameter
+        init = b"www.example.com"
+        domain[:len(init)] = init
+        # Domain= attribute is shorter
+        attr = b"example.com"
+        # Fixed version: clear before copy
+        domain[:] = b'\x00' * MAX
+        domain[:len(attr)] = attr
+        self.assertEqual(domain.rstrip(b'\x00'), attr)
+
 
 if __name__ == "__main__":
     unittest.main()
